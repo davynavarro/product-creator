@@ -1,19 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { unlink, readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
-
-interface ProductIndexItem {
-  id: string;
-  productName: string;
-  slug: string;
-  category: string;
-  createdAt: string;
-  imageUrl: string;
-  pricing: {
-    currency: string;
-    price: number;
-  };
-}
+import { deleteProductFromBlob } from '@/lib/blob-storage';
 
 // Delete individual product
 export async function DELETE(request: NextRequest) {
@@ -25,7 +11,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
 
-    await deleteProduct(productId);
+    await deleteProductFromBlob(productId);
 
     return NextResponse.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {
@@ -46,7 +32,7 @@ export async function POST(request: NextRequest) {
     const results = [];
     for (const productId of productIds) {
       try {
-        await deleteProduct(productId);
+        await deleteProductFromBlob(productId);
         results.push({ id: productId, success: true });
       } catch (error) {
         console.error(`Failed to delete product ${productId}:`, error);
@@ -65,65 +51,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Bulk delete error:', error);
     return NextResponse.json({ error: 'Failed to delete products' }, { status: 500 });
-  }
-}
-
-async function deleteProduct(productId: string) {
-  const productsDir = join(process.cwd(), 'data', 'products');
-  const productFile = join(productsDir, `${productId}.json`);
-
-  // Read product data to get image URL before deletion
-  let imageUrl = '';
-  try {
-    const productContent = await readFile(productFile, 'utf-8');
-    const productData = JSON.parse(productContent);
-    imageUrl = productData.imageUrl;
-  } catch (error) {
-    console.warn(`Could not read product file for ${productId}:`, error);
-  }
-
-  // Delete product file
-  try {
-    await unlink(productFile);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw new Error(`Failed to delete product file: ${error}`);
-    }
-  }
-
-  // Delete associated image file
-  if (imageUrl) {
-    const imagePath = imageUrl.replace('/uploads/', '');
-    const imageFile = join(process.cwd(), 'uploads', imagePath);
-    try {
-      await unlink(imageFile);
-    } catch (error) {
-      console.warn(`Could not delete image file ${imageFile}:`, error);
-    }
-  }
-
-  // Update products index
-  await updateProductsIndex(productId);
-}
-
-async function updateProductsIndex(deletedProductId: string) {
-  try {
-    const indexPath = join(process.cwd(), 'data', 'products', 'index.json');
-    
-    let productsIndex: ProductIndexItem[] = [];
-    try {
-      const indexContent = await readFile(indexPath, 'utf-8');
-      productsIndex = JSON.parse(indexContent);
-    } catch {
-      // Index doesn't exist, nothing to update
-      return;
-    }
-
-    // Remove the deleted product from index
-    productsIndex = productsIndex.filter(product => product.id !== deletedProductId);
-
-    await writeFile(indexPath, JSON.stringify(productsIndex, null, 2));
-  } catch (error) {
-    console.error('Failed to update products index after deletion:', error);
   }
 }

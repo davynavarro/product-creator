@@ -53,6 +53,8 @@ export default function ProductPage({ productData, imageUrl, productId, onBack }
       });
 
       if (response.ok) {
+        // Force router to refresh and clear cache
+        router.refresh();
         router.push('/products');
       } else {
         console.error('Failed to delete product');

@@ -63,6 +63,41 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
     }
   };
 
+  const refreshProducts = async () => {
+    try {
+      // Add delay and retry logic to handle caching
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        const response = await fetch(`/api/products?t=${Date.now()}&r=${Math.random()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          }
+        });
+        
+        if (response.ok) {
+          const freshProducts = await response.json();
+          setProducts(freshProducts);
+          console.log('Products refreshed:', freshProducts.length);
+          return;
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          console.log(`Refresh attempt ${attempts} failed, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      console.error('Failed to refresh products after', maxAttempts, 'attempts');
+    } catch (error) {
+      console.error('Failed to refresh products:', error);
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedProducts.size === 0) return;
 
@@ -79,10 +114,15 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
       });
 
       if (response.ok) {
-        // Remove deleted products from the list
+        // Optimistically remove from UI first
         setProducts(prev => prev.filter(p => !selectedProducts.has(p.id)));
         setSelectedProducts(new Set());
         setShowBulkDeleteConfirm(false);
+        
+        // Then refresh from server with a small delay to allow propagation
+        setTimeout(() => {
+          refreshProducts();
+        }, 1000);
       } else {
         console.error('Failed to delete products');
         alert('Failed to delete some products');

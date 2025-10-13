@@ -12,6 +12,7 @@
     "@tailwindcss/line-clamp": "^0.4.4",
     "@types/multer": "^2.0.0",
     "@types/uuid": "^10.0.0",
+    "@vercel/blob": "^2.0.0",
     "lucide-react": "^0.545.0",
     "multer": "^2.0.2",
     "next": "15.5.4",

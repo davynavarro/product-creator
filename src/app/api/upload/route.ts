@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { uploadImageToBlob } from '@/lib/blob-storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,25 +21,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Generate unique filename
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExtension}`;
-    const uploadDir = process.env.UPLOAD_DIR || './uploads';
-    const filePath = join(process.cwd(), uploadDir, fileName);
-
-    // Save file
-    await writeFile(filePath, buffer);
+    // Upload to Vercel Blob
+    const imageUrl = await uploadImageToBlob(file);
 
     return NextResponse.json({
       success: true,
-      fileName,
+      fileName: file.name,
       originalName: file.name,
       size: file.size,
       type: file.type,
-      url: `/uploads/${fileName}`
+      url: imageUrl
     });
 
   } catch (error) {
