@@ -37,8 +37,70 @@ export default function ProductBuilderForm({ onProductGenerated }: ProductBuilde
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  // Image compression function
+  const compressImage = (file: File, maxSizeKB: number = 300): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      const img = new Image();
+
+      img.onload = () => {
+        // Calculate new dimensions while maintaining aspect ratio
+        const maxWidth = 1200; // Max width for good quality
+        const maxHeight = 1200; // Max height for good quality
+        
+        let { width, height } = img;
+        
+        // Scale down if image is too large
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width *= ratio;
+          height *= ratio;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try different quality levels to get under the size limit
+        const tryCompress = (quality: number): void => {
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const sizeKB = blob.size / 1024;
+                console.log(`Compressed to ${sizeKB.toFixed(1)}KB at quality ${quality}`);
+                
+                if (sizeKB <= maxSizeKB || quality <= 0.1) {
+                  // Create new file with compressed blob
+                  const compressedFile = new File([blob], file.name, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now(),
+                  });
+                  resolve(compressedFile);
+                } else {
+                  // Try with lower quality
+                  tryCompress(quality - 0.1);
+                }
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+
+        // Start with high quality and work down
+        tryCompress(0.9);
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  };
 
   const {
     register,
@@ -52,8 +114,23 @@ export default function ProductBuilderForm({ onProductGenerated }: ProductBuilde
   const imagePreview = imageFiles && imageFiles[0] ? URL.createObjectURL(imageFiles[0]) : null;
 
   const uploadImage = async (file: File): Promise<string> => {
+    console.log(`Original file size: ${(file.size / 1024).toFixed(1)}KB`);
+    
+    // Compress the image if it's larger than 300KB
+    let fileToUpload = file;
+    if (file.size > 300 * 1024) { // 300KB in bytes
+      console.log('Compressing image...');
+      setIsCompressing(true);
+      try {
+        fileToUpload = await compressImage(file, 300);
+        console.log(`Compressed file size: ${(fileToUpload.size / 1024).toFixed(1)}KB`);
+      } finally {
+        setIsCompressing(false);
+      }
+    }
+
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('image', fileToUpload);
 
     const response = await fetch('/api/upload', {
       method: 'POST',
@@ -146,10 +223,11 @@ export default function ProductBuilderForm({ onProductGenerated }: ProductBuilde
       setIsUploading(false);
       setIsGenerating(false);
       setIsSaving(false);
+      setIsCompressing(false);
     }
   };
 
-  const isProcessing = isUploading || isGenerating || isSaving;
+  const isProcessing = isUploading || isGenerating || isSaving || isCompressing;
 
   return (
     <div className="max-w-2xl mx-auto p-6">
@@ -196,7 +274,7 @@ export default function ProductBuilderForm({ onProductGenerated }: ProductBuilde
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  PNG, JPG, GIF up to 10MB
+                  PNG, JPG, GIF up to 10MB (automatically compressed to under 300KB)
                 </div>
               </div>
             )}
@@ -269,6 +347,12 @@ export default function ProductBuilderForm({ onProductGenerated }: ProductBuilde
         {/* Progress Indicator */}
         {isProcessing && (
           <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            {isCompressing && (
+              <>
+                <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                <span className="text-sm text-blue-700">Compressing image...</span>
+              </>
+            )}
             {isUploading && (
               <>
                 <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
