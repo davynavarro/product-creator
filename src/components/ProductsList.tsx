@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Trash2, Check } from 'lucide-react';
+import { Trash2, Check, Search, X } from 'lucide-react';
+import { SimpleCategorySelect } from './CategorySelector';
 
 interface ProductIndexItem {
   id: string;
   productName: string;
   slug: string;
-  category: string;
+  category: string; // Legacy field for backward compatibility
+  categoryId?: string; // New structured category reference
+  categoryPath?: string; // Full category path (e.g., "Electronics > Smartphones")
   createdAt: string;
   imageUrl: string;
   pricing: {
@@ -20,6 +23,26 @@ interface ProductIndexItem {
   };
 }
 
+interface SearchState {
+  searchTerm: string;
+  selectedCategory: string | null; // Now uses categoryId instead of category string
+  selectedCategoryPath: string | null; // Display path for selected category
+  priceRange: {
+    min: number | null;
+    max: number | null;
+  };
+  selectedTags: string[];
+  dateRange: {
+    from: Date | null;
+    to: Date | null;
+    preset?: 'week' | 'month' | 'quarter' | 'year' | 'custom';
+  };
+  sortBy: 'date' | 'name' | 'price';
+  sortDirection: 'asc' | 'desc';
+}
+
+
+
 interface ProductsListProps {
   initialProducts: ProductIndexItem[];
 }
@@ -29,6 +52,29 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Search and filtering state
+  const [searchState, setSearchState] = useState<SearchState>({
+    searchTerm: '',
+    selectedCategory: null,
+    selectedCategoryPath: null,
+    priceRange: { min: null, max: null },
+    selectedTags: [],
+    dateRange: { from: null, to: null },
+    sortBy: 'date',
+    sortDirection: 'desc'
+  });
+
+  // Debounced search term for performance
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchState.searchTerm);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchState.searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchState.searchTerm]);
 
   const formatPrice = (price: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -45,6 +91,88 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
     });
   };
 
+  // Search and filtering functions
+  const filterProducts = useCallback((productsToFilter: ProductIndexItem[], state: SearchState, searchTerm: string): ProductIndexItem[] => {
+    return productsToFilter.filter(product => {
+      // Text search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesText = 
+          product.productName.toLowerCase().includes(searchLower) ||
+          product.category.toLowerCase().includes(searchLower);
+        if (!matchesText) return false;
+      }
+
+      // Category filter - support both new categoryId and legacy category string
+      if (state.selectedCategory) {
+        const matchesNewCategory = product.categoryId === state.selectedCategory;
+        const matchesLegacyCategory = product.category === state.selectedCategory;
+        if (!matchesNewCategory && !matchesLegacyCategory) {
+          return false;
+        }
+      }
+
+      // Price range filter
+      if (state.priceRange.min !== null && product.pricing.price < state.priceRange.min) {
+        return false;
+      }
+      if (state.priceRange.max !== null && product.pricing.price > state.priceRange.max) {
+        return false;
+      }
+
+      // Date range filter
+      if (state.dateRange.from || state.dateRange.to) {
+        const productDate = new Date(product.createdAt);
+        if (state.dateRange.from && productDate < state.dateRange.from) {
+          return false;
+        }
+        if (state.dateRange.to && productDate > state.dateRange.to) {
+          return false;
+        }
+      }
+
+      // Tag filter (would need tags in product data structure)
+      // if (state.selectedTags.length > 0) {
+      //   const hasMatchingTag = state.selectedTags.some(tag => 
+      //     product.tags?.includes(tag)
+      //   );
+      //   if (!hasMatchingTag) return false;
+      // }
+
+      return true;
+    });
+  }, []);
+
+  const sortProducts = useCallback((productsToSort: ProductIndexItem[], state: SearchState): ProductIndexItem[] => {
+    const sorted = [...productsToSort].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (state.sortBy) {
+        case 'date':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case 'name':
+          comparison = a.productName.localeCompare(b.productName);
+          break;
+        case 'price':
+          comparison = a.pricing.price - b.pricing.price;
+          break;
+        default:
+          return 0;
+      }
+
+      return state.sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, []);
+
+  // Memoized filtered and sorted products
+  const filteredAndSortedProducts = useMemo(() => {
+    const filtered = filterProducts(products, searchState, debouncedSearchTerm);
+    return sortProducts(filtered, searchState);
+  }, [products, searchState, debouncedSearchTerm, filterProducts, sortProducts]);
+
   const handleSelectProduct = (productId: string) => {
     const newSelected = new Set(selectedProducts);
     if (newSelected.has(productId)) {
@@ -56,43 +184,40 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
   };
 
   const handleSelectAll = () => {
-    if (selectedProducts.size === products.length) {
+    if (selectedProducts.size === filteredAndSortedProducts.length) {
       setSelectedProducts(new Set());
     } else {
-      setSelectedProducts(new Set(products.map(p => p.id)));
+      setSelectedProducts(new Set(filteredAndSortedProducts.map(p => p.id)));
     }
   };
 
   const refreshProducts = async () => {
     try {
-      // Add delay and retry logic to handle caching
-      let attempts = 0;
-      const maxAttempts = 3;
+      // First trigger server-side cache revalidation
+      await fetch('/api/revalidate-cache', { 
+        method: 'GET',
+        cache: 'no-store'
+      }).catch(() => {
+        // Non-critical if this fails, continue with client refresh
+        console.log('Server cache revalidation skipped');
+      });
+
+      // Then fetch fresh data
+      const response = await fetch('/api/products', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
       
-      while (attempts < maxAttempts) {
-        const response = await fetch(`/api/products?t=${Date.now()}&r=${Math.random()}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-          }
-        });
-        
-        if (response.ok) {
-          const freshProducts = await response.json();
-          setProducts(freshProducts);
-          console.log('Products refreshed:', freshProducts.length);
-          return;
-        }
-        
-        attempts++;
-        if (attempts < maxAttempts) {
-          console.log(`Refresh attempt ${attempts} failed, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      if (response.ok) {
+        const freshProducts = await response.json();
+        setProducts(freshProducts);
+        console.log('Products refreshed:', freshProducts.length);
+      } else {
+        console.error('Failed to refresh products:', response.status);
       }
-      
-      console.error('Failed to refresh products after', maxAttempts, 'attempts');
     } catch (error) {
       console.error('Failed to refresh products:', error);
     }
@@ -141,8 +266,8 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Generated Products</h1>
-            <p className="text-gray-600 mt-2">
-              {products.length} product{products.length !== 1 ? 's' : ''} generated
+            <p className="text-base text-gray-700 mt-2">
+              {filteredAndSortedProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''} shown
             </p>
           </div>
           
@@ -167,12 +292,161 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
           </div>
         </div>
 
+        {/* Search and Filter Interface */}
+        {products.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+              {/* Search Input */}
+              <div className="flex-1 min-w-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600 h-5 w-5" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchState.searchTerm}
+                    onChange={(e) => setSearchState(prev => ({ ...prev, searchTerm: e.target.value }))}
+                    className="w-full pl-10 pr-4 py-2 text-base text-gray-900 placeholder-gray-500 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    aria-label="Search products"
+                  />
+                </div>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <SimpleCategorySelect
+                  value={searchState.selectedCategory}
+                  onChange={(categoryId, categoryPath) => setSearchState(prev => ({
+                    ...prev,
+                    selectedCategory: categoryId,
+                    selectedCategoryPath: categoryPath
+                  }))}
+                  placeholder="All Categories"
+                  allowEmpty={true}
+                  className="text-base text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+
+                {/* Price Range Filter */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min $"
+                    value={searchState.priceRange.min ?? ''}
+                    onChange={(e) => setSearchState(prev => ({
+                      ...prev,
+                      priceRange: {
+                        ...prev.priceRange,
+                        min: e.target.value ? Number(e.target.value) : null
+                      }
+                    }))}
+                    className="w-24 px-2 py-2 text-base text-gray-900 placeholder-gray-500 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <span className="text-gray-700 font-medium">-</span>
+                  <input
+                    type="number"
+                    placeholder="Max $"
+                    value={searchState.priceRange.max ?? ''}
+                    onChange={(e) => setSearchState(prev => ({
+                      ...prev,
+                      priceRange: {
+                        ...prev.priceRange,
+                        max: e.target.value ? Number(e.target.value) : null
+                      }
+                    }))}
+                    className="w-24 px-2 py-2 text-base text-gray-900 placeholder-gray-500 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Sort Controls */}
+                <select
+                  value={`${searchState.sortBy}-${searchState.sortDirection}`}
+                  onChange={(e) => {
+                    const [sortBy, sortDirection] = e.target.value.split('-') as [typeof searchState.sortBy, typeof searchState.sortDirection];
+                    setSearchState(prev => ({ ...prev, sortBy, sortDirection }));
+                  }}
+                  className="px-3 py-2 text-base text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="name-asc">Name A-Z</option>
+                  <option value="name-desc">Name Z-A</option>
+                  <option value="price-asc">Price Low-High</option>
+                  <option value="price-desc">Price High-Low</option>
+                </select>
+
+                {/* Clear Filters Button */}
+                {(searchState.searchTerm || searchState.selectedCategory || 
+                  searchState.priceRange.min !== null || searchState.priceRange.max !== null) && (
+                  <button
+                    onClick={() => setSearchState({
+                      searchTerm: '',
+                      selectedCategory: null,
+                      selectedCategoryPath: null,
+                      priceRange: { min: null, max: null },
+                      selectedTags: [],
+                      dateRange: { from: null, to: null },
+                      sortBy: 'date',
+                      sortDirection: 'desc'
+                    })}
+                    className="px-3 py-2 text-base text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Active Filters Display */}
+            {(searchState.searchTerm || searchState.selectedCategory || 
+              searchState.priceRange.min !== null || searchState.priceRange.max !== null) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {searchState.searchTerm && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-base font-medium bg-blue-100 text-blue-900">
+                    Search: &quot;{searchState.searchTerm}&quot;
+                    <button
+                      onClick={() => setSearchState(prev => ({ ...prev, searchTerm: '' }))}
+                      className="ml-2 h-4 w-4 text-blue-700 hover:text-blue-900"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+                {searchState.selectedCategory && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-base font-medium bg-green-100 text-green-900">
+                    Category: {searchState.selectedCategoryPath || searchState.selectedCategory}
+                    <button
+                      onClick={() => setSearchState(prev => ({ ...prev, selectedCategory: null, selectedCategoryPath: null }))}
+                      className="ml-2 h-4 w-4 text-green-700 hover:text-green-900"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+                {(searchState.priceRange.min !== null || searchState.priceRange.max !== null) && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-base font-medium bg-purple-100 text-purple-900">
+                    Price: {searchState.priceRange.min !== null ? `$${searchState.priceRange.min}` : '$0'} - {searchState.priceRange.max !== null ? `$${searchState.priceRange.max}` : '∞'}
+                    <button
+                      onClick={() => setSearchState(prev => ({ 
+                        ...prev, 
+                        priceRange: { min: null, max: null } 
+                      }))}
+                      className="ml-2 h-4 w-4 text-purple-700 hover:text-purple-900"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {products.length > 0 && (
           <div className="mb-4 flex items-center">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={selectedProducts.size === products.length && products.length > 0}
+                checked={selectedProducts.size === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0}
                 onChange={handleSelectAll}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
@@ -199,9 +473,32 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
               Get Started
             </Link>
           </div>
+        ) : filteredAndSortedProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <Search className="mx-auto h-12 w-12" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+            <p className="text-gray-600 mb-6">Try adjusting your search criteria or filters</p>
+            <button
+              onClick={() => setSearchState({
+                searchTerm: '',
+                selectedCategory: null,
+                selectedCategoryPath: null,
+                priceRange: { min: null, max: null },
+                selectedTags: [],
+                dateRange: { from: null, to: null },
+                sortBy: 'date',
+                sortDirection: 'desc'
+              })}
+              className="inline-flex items-center px-6 py-3 text-base font-medium bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Clear All Filters
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
+            {filteredAndSortedProducts.map((product) => (
               <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="relative">
                   <div className="absolute top-2 left-2 z-10">

@@ -25,7 +25,17 @@ interface ProductData {
   };
   benefits: string[];
   targetAudience: string;
-  category: string;
+  category: string; // Legacy field for backward compatibility
+  categoryId?: string; // New structured category reference
+  categoryPath?: string; // Full category path
+  categoryConfidence?: number; // AI confidence in category selection
+  categoryReasoning?: string; // AI reasoning for category choice
+  categoryMetadata?: {
+    confidence: number;
+    reasoning: string;
+    isNovelProduct?: boolean;
+    assignmentMethod?: 'ai_primary' | 'fallback';
+  };
   tags: string[];
 }
 

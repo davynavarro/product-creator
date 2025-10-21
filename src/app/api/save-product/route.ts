@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { saveProductToBlob } from '@/lib/blob-storage';
 
@@ -16,7 +17,17 @@ interface ProductData {
   };
   benefits: string[];
   targetAudience: string;
-  category: string;
+  category: string; // Legacy field for backward compatibility
+  categoryId?: string; // New structured category reference
+  categoryPath?: string; // Full category path
+  categoryConfidence?: number; // AI confidence in category selection
+  categoryReasoning?: string; // AI reasoning for category choice
+  categoryMetadata?: {
+    confidence: number;
+    reasoning: string;
+    isNovelProduct?: boolean;
+    assignmentMethod?: 'ai_primary' | 'fallback';
+  };
   tags: string[];
 }
 
@@ -52,6 +63,16 @@ export async function POST(request: NextRequest) {
 
     // Save to Vercel Blob
     await saveProductToBlob(productRecord);
+
+    // Invalidate related caches to ensure fresh data
+    try {
+      revalidatePath('/products');
+      revalidatePath('/api/products');
+      revalidatePath('/');
+      console.log('Cache invalidated after product save');
+    } catch (revalidateError) {
+      console.warn('Cache revalidation failed (non-critical):', revalidateError);
+    }
 
     return NextResponse.json({
       success: true,

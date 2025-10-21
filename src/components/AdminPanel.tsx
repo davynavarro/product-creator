@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2, Database, AlertTriangle, Eye, Loader2 } from 'lucide-react';
+import { Trash2, Database, AlertTriangle, Eye, Loader2, Folder } from 'lucide-react';
+import CategoryManagement from './CategoryManagement';
 
 interface BlobInfo {
   pathname: string;
@@ -16,11 +17,17 @@ interface StorageStats {
 }
 
 export default function AdminPanel() {
+  const [activeTab, setActiveTab] = useState('storage');
   const [isClearing, setIsClearing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const tabs = [
+    { id: 'storage', name: 'Storage Management', icon: Database },
+    { id: 'categories', name: 'Category Management', icon: Folder },
+  ];
 
   const loadStorageStats = async () => {
     setIsLoading(true);
@@ -83,8 +90,36 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Storage Stats Section */}
-      <div className="bg-white rounded-lg shadow p-6">
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'categories' && <CategoryManagement />}
+      
+      {activeTab === 'storage' && (
+        <>
+          {/* Storage Stats Section */}
+          <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900 flex items-center">
             <Database className="h-5 w-5 mr-2" />
@@ -256,17 +291,19 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Status Message */}
-      {message && (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-sm text-blue-700">
-                {message}
-              </p>
+          {/* Status Message */}
+          {message && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    {message}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );

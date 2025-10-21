@@ -1,0 +1,541 @@
+
+> genai-product-builder@0.1.0 dev
+> next dev --turbopack
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/davyred/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/davyred/Documents/Projects/_POCS/Retail/genai-product-builder/package-lock.json
+
+   ▲ Next.js 15.5.4 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.133:3000
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · staleTimes
+
+ ✓ Starting...
+ ✓ Ready in 598ms
+ ○ Compiling /api/products ...
+ ✓ Compiled /api/products in 618ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052645967&r=0.19263537454700375
+Successfully fetched 2 products
+ GET /api/products 200 in 1059ms
+ ○ Compiling / ...
+ ✓ Compiled / in 842ms
+ GET /?id=a2dfd613-43b2-4afe-a581-061d20669e22&vscodeBrowserReqId=1761052650290 200 in 992ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052669207&r=0.43323143754816673
+Successfully fetched 2 products
+ GET /api/products 200 in 341ms
+ ✓ Compiled /api/categories in 62ms
+ GET /api/categories?format=flat 200 in 400ms
+ ✓ Compiled /api/generate-product in 129ms
+ POST /api/generate-product 400 in 370ms
+ POST /api/generate-product 400 in 226ms
+Categories already exist, skipping initialization
+ POST /api/generate-product 200 in 4767ms
+ POST /api/generate-product 200 in 4924ms
+ POST /api/generate-product 200 in 4500ms
+ POST /api/generate-product 200 in 4811ms
+ POST /api/generate-product 200 in 4538ms
+ ✓ Compiled /products/[productId] in 194ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052848476&r=0.3692325460238075
+Successfully fetched 2 products
+ GET /products/318de58d-0964-443f-8bdd-aac1a24306f2 200 in 770ms
+ ✓ Compiled /favicon.ico in 52ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 281ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 223ms
+ GET / 200 in 34ms
+ ✓ Compiled /products in 152ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052852391&r=0.34436036390770863
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /products 200 in 233ms
+ GET /api/categories?format=flat 200 in 277ms
+ GET /api/categories?format=flat 200 in 270ms
+ ✓ Compiled /api/delete-products in 71ms
+Starting deletion of product: 318de58d-0964-443f-8bdd-aac1a24306f2
+Found product to delete: AeroGlide Street Cruiser
+Deleting product file: products/318de58d-0964-443f-8bdd-aac1a24306f2.json
+Deleting associated image: 1761051557815-skate.png
+Updating products index to remove: 318de58d-0964-443f-8bdd-aac1a24306f2
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052858887&r=0.9431639763067792
+Successfully fetched 2 products
+Successfully removed product 318de58d-0964-443f-8bdd-aac1a24306f2 from index
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052859637&r=0.698219215756166
+Successfully fetched 2 products
+Retry 1: Product still exists in index, retrying...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052859675&r=0.8954167026848896
+Successfully fetched 2 products
+Successfully removed product 318de58d-0964-443f-8bdd-aac1a24306f2 from index
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052860706&r=0.49188034285411697
+Successfully fetched 2 products
+Retry 2: Product still exists in index, retrying...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052860745&r=0.9335525158168019
+Successfully fetched 2 products
+Successfully removed product 318de58d-0964-443f-8bdd-aac1a24306f2 from index
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052862031&r=0.8349179168127447
+Successfully fetched 2 products
+Retry 3: Product still exists in index, retrying...
+Error deleting product from blob: Error: Failed to remove product 318de58d-0964-443f-8bdd-aac1a24306f2 from index after 3 attempts
+    at removeFromProductsIndex (src/lib/blob-storage.ts:300:9)
+    at async deleteProductFromBlob (src/lib/blob-storage.ts:172:5)
+    at async POST (src/app/api/delete-products/route.ts:35:9)
+  298 |   }
+  299 |   
+> 300 |   throw new Error(`Failed to remove product ${productId} from index after ${maxRetries} attempts`);
+      |         ^
+  301 | }
+  302 |
+  303 | // List all blobs (for debugging/admin purposes)
+Failed to delete product 318de58d-0964-443f-8bdd-aac1a24306f2: Error: Failed to remove product 318de58d-0964-443f-8bdd-aac1a24306f2 from index after 3 attempts
+    at removeFromProductsIndex (src/lib/blob-storage.ts:300:9)
+    at async deleteProductFromBlob (src/lib/blob-storage.ts:172:5)
+    at async POST (src/app/api/delete-products/route.ts:35:9)
+  298 |   }
+  299 |   
+> 300 |   throw new Error(`Failed to remove product ${productId} from index after ${maxRetries} attempts`);
+      |         ^
+  301 | }
+  302 |
+  303 | // List all blobs (for debugging/admin purposes)
+Starting deletion of product: d8137bf2-31fb-4672-ba35-429fb07cc3e3
+Found product to delete: PVC Bearded Dragon Reptile Action Figure
+Deleting product file: products/d8137bf2-31fb-4672-ba35-429fb07cc3e3.json
+Deleting associated image: 1761050877632-1755593891.png
+Updating products index to remove: d8137bf2-31fb-4672-ba35-429fb07cc3e3
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052862732&r=0.11580383359765256
+Successfully fetched 2 products
+Successfully removed product d8137bf2-31fb-4672-ba35-429fb07cc3e3 from index
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052863453&r=0.1949096292282717
+Successfully fetched 2 products
+Retry 1: Product still exists in index, retrying...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052863511&r=0.7374662242677599
+Successfully fetched 2 products
+Successfully removed product d8137bf2-31fb-4672-ba35-429fb07cc3e3 from index
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052864274&r=0.47294881199618866
+Successfully fetched 2 products
+Retry 2: Product still exists in index, retrying...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052864313&r=0.09316066287061608
+Successfully fetched 2 products
+Successfully removed product d8137bf2-31fb-4672-ba35-429fb07cc3e3 from index
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052865037&r=0.13868273083999494
+Successfully fetched 2 products
+Retry 3: Product still exists in index, retrying...
+Error deleting product from blob: Error: Failed to remove product d8137bf2-31fb-4672-ba35-429fb07cc3e3 from index after 3 attempts
+    at removeFromProductsIndex (src/lib/blob-storage.ts:300:9)
+    at async deleteProductFromBlob (src/lib/blob-storage.ts:172:5)
+    at async POST (src/app/api/delete-products/route.ts:35:9)
+  298 |   }
+  299 |   
+> 300 |   throw new Error(`Failed to remove product ${productId} from index after ${maxRetries} attempts`);
+      |         ^
+  301 | }
+  302 |
+  303 | // List all blobs (for debugging/admin purposes)
+Failed to delete product d8137bf2-31fb-4672-ba35-429fb07cc3e3: Error: Failed to remove product d8137bf2-31fb-4672-ba35-429fb07cc3e3 from index after 3 attempts
+    at removeFromProductsIndex (src/lib/blob-storage.ts:300:9)
+    at async deleteProductFromBlob (src/lib/blob-storage.ts:172:5)
+    at async POST (src/app/api/delete-products/route.ts:35:9)
+  298 |   }
+  299 |   
+> 300 |   throw new Error(`Failed to remove product ${productId} from index after ${maxRetries} attempts`);
+      |         ^
+  301 | }
+  302 |
+  303 | // List all blobs (for debugging/admin purposes)
+ POST /api/delete-products 200 in 7312ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052866391&r=0.7255625765284306
+Successfully fetched 2 products
+ GET /api/products?t=1761052866157&r=0.5893481561084175 200 in 267ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052866465&r=0.8823705440110059
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /api/categories?format=flat 200 in 82ms
+ GET /products 200 in 109ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 229ms
+ GET /api/categories?format=flat 200 in 262ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 229ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052867439&r=0.09952382333100496
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /products 200 in 88ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052867686&r=0.3419588614021478
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 153ms
+ GET /api/categories?format=flat 200 in 88ms
+ GET /products 200 in 81ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052867906&r=0.5824618205311989
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 135ms
+ GET /api/categories?format=flat 200 in 65ms
+ GET /products 200 in 88ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052868094&r=0.8037418018577844
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 104ms
+ GET /api/categories?format=flat 200 in 28ms
+ GET /products 200 in 87ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052868354&r=0.7244528809675024
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 177ms
+ GET /api/categories?format=flat 200 in 103ms
+ GET /products 200 in 77ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052868601&r=0.6351375857157915
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 166ms
+ GET /api/categories?format=flat 200 in 94ms
+ GET /products 200 in 81ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 229ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052869053&r=0.4882468146135428
+ GET /api/categories?format=flat 200 in 260ms
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 132ms
+ GET /products 200 in 76ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 235ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052869510&r=0.03896169176476194
+ GET /api/categories?format=flat 200 in 263ms
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 139ms
+ GET /products 200 in 80ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052869746&r=0.3867335883632159
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 159ms
+ GET /api/categories?format=flat 200 in 89ms
+ GET /products 200 in 83ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052869991&r=0.6346286739627696
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 162ms
+ GET /api/categories?format=flat 200 in 87ms
+ GET /products 200 in 83ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052870208&r=0.9561552866070409
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 146ms
+ GET /api/categories?format=flat 200 in 72ms
+ GET /products 200 in 95ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 234ms
+ GET /api/categories?format=flat 200 in 264ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 225ms
+ProductsPage: Fetching products...
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052874008&r=0.005840627897727435
+Successfully fetched 2 products
+ProductsPage: Fetched 2 products: [
+  '318de58d-0964-443f-8bdd-aac1a24306f2',
+  'd8137bf2-31fb-4672-ba35-429fb07cc3e3'
+]
+ GET /products 200 in 94ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 264ms
+ GET /api/categories?format=flat 200 in 260ms
+ GET / 200 in 56ms
+ GET / 200 in 49ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 230ms
+ ✓ Compiled /admin in 132ms
+ GET /admin 200 in 159ms
+ ✓ Compiled /api/clear-all in 51ms
+ GET /api/clear-all 200 in 735ms
+Starting to clear all blob storage...
+Found 2 blobs to delete
+Deleting blob: categories.json
+Deleting blob: products-index.json
+Deletion complete: 2 successful, 0 failed
+ DELETE /api/clear-all 200 in 655ms
+ GET /admin 200 in 61ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 237ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 224ms
+ GET /admin 200 in 52ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 226ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 241ms
+ ✓ Compiled /api/migrate-categories in 53ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052891732&r=0.6623256787055387
+Categories already exist, skipping initialization
+ GET /api/categories?format=flat&initDefaults=true 200 in 374ms
+Successfully fetched 2 products
+ GET /api/migrate-categories 200 in 424ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052892096&r=0.4083080011247411
+ GET /api/categories?format=tree 200 in 280ms
+Categories already exist, skipping initialization
+ GET /api/categories?format=flat&initDefaults=true 200 in 317ms
+Successfully fetched 2 products
+ GET /api/migrate-categories 200 in 359ms
+ GET /api/categories?format=tree 200 in 265ms
+ GET /admin 200 in 56ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 225ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 223ms
+ GET /api/clear-all 200 in 467ms
+ GET /api/clear-all 200 in 367ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052899183&r=0.8701245290729258
+Successfully fetched 2 products
+Categories already exist, skipping initialization
+ GET /api/categories?format=flat&initDefaults=true 200 in 385ms
+ GET /api/migrate-categories 200 in 445ms
+ GET /api/migrate-categories 200 in 86ms
+ GET /api/categories?format=flat&initDefaults=true 200 in 148ms
+ GET /api/categories?format=tree 200 in 147ms
+ GET /admin 200 in 46ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052899609&r=0.2994285862958368
+Categories already exist, skipping initialization
+Successfully fetched 2 products
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 251ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 150ms
+ GET /admin 200 in 49ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 230ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 228ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052901156&r=0.7934904013504562
+Successfully fetched 2 products
+Categories already exist, skipping initialization
+ GET /api/categories?format=flat&initDefaults=true 200 in 300ms
+ GET /api/migrate-categories 200 in 301ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052901471&r=0.5215642351521008
+Categories already exist, skipping initialization
+ GET /api/categories?format=tree 200 in 277ms
+Successfully fetched 2 products
+ GET /api/categories?format=flat&initDefaults=true 200 in 312ms
+ GET /api/migrate-categories 200 in 313ms
+ GET /api/categories?format=tree 200 in 262ms
+ GET /admin 200 in 63ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 181ms
+ GET /admin 200 in 48ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 119ms
+ GET /admin 200 in 44ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 229ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 226ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052905600&r=0.4688056528818838
+Categories already exist, skipping initialization
+ GET /api/categories?format=flat&initDefaults=true 200 in 314ms
+Successfully fetched 2 products
+ GET /api/migrate-categories 200 in 386ms
+ GET /api/categories?format=tree 200 in 265ms
+Categories already exist, skipping initialization
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052905970&r=0.007478418478182869
+ GET /api/categories?format=flat&initDefaults=true 200 in 304ms
+Successfully fetched 2 products
+ GET /api/migrate-categories 200 in 292ms
+ GET /api/categories?format=tree 200 in 265ms
+ GET /admin 200 in 58ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 245ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 227ms
+ GET /api/clear-all 200 in 526ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052916239&r=0.2739241556509471
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052916241&r=0.9438026255017882
+Successfully fetched 2 products
+Categories already exist, skipping initialization
+Categories already exist, skipping initialization
+Successfully fetched 2 products
+ GET /api/categories?format=flat&initDefaults=true 200 in 400ms
+ GET /api/categories?format=flat&initDefaults=true 200 in 403ms
+ GET /api/migrate-categories 200 in 407ms
+ GET /api/migrate-categories 200 in 468ms
+ GET /api/categories?format=tree 200 in 269ms
+ GET /api/categories?format=tree 200 in 270ms
+ GET /admin 200 in 69ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 233ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 225ms
+ GET /api/clear-all 200 in 456ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052928152&r=0.3707456647023557
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052928154&r=0.9750575855871955
+Successfully fetched 2 products
+Categories already exist, skipping initialization
+Failed to fetch products index: 404 Not Found
+ GET /api/categories?format=flat&initDefaults=true 200 in 417ms
+ GET /api/migrate-categories 200 in 431ms
+ GET /api/migrate-categories 200 in 484ms
+ GET /api/categories?format=tree 200 in 261ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 753ms
+ GET /api/categories?format=tree 200 in 259ms
+ GET /admin 200 in 64ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 241ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 222ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052934390&r=0.5274418534263563
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052934393&r=0.9078497287020044
+Failed to fetch products index: 404 Not Found
+Failed to fetch products index: 404 Not Found
+Categories already exist, skipping initialization
+ GET /api/migrate-categories 200 in 405ms
+ GET /api/categories?format=flat&initDefaults=true 200 in 408ms
+ GET /api/migrate-categories 200 in 409ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 623ms
+ GET /api/categories?format=tree 200 in 259ms
+ GET /api/categories?format=tree 200 in 265ms
+ POST /api/categories 201 in 713ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 484ms
+ GET /api/categories?format=tree 200 in 259ms
+ GET /admin 200 in 67ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 263ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 227ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052957296&r=0.24486167370542633
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052957300&r=0.40281447227207257
+Categories already exist, skipping initialization
+Failed to fetch products index: 404 Not Found
+Successfully fetched 2 products
+ GET /api/migrate-categories 200 in 395ms
+ GET /api/categories?format=flat&initDefaults=true 200 in 423ms
+Categories already exist, skipping initialization
+ GET /api/categories?format=flat&initDefaults=true 200 in 458ms
+ GET /api/migrate-categories 200 in 459ms
+ GET /api/categories?format=tree 200 in 264ms
+ GET /api/categories?format=tree 200 in 260ms
+ GET /admin 200 in 62ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 258ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 109ms
+ GET /admin 200 in 47ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 240ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 224ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052961262&r=0.7539401127616643
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052961264&r=0.6056577978616953
+Failed to fetch products index: 404 Not Found
+Failed to fetch products index: 404 Not Found
+ GET /api/migrate-categories 200 in 316ms
+ GET /api/migrate-categories 200 in 317ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 540ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 736ms
+ GET /api/categories?format=tree 200 in 267ms
+ GET /api/categories?format=tree 200 in 262ms
+ GET /admin 200 in 59ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 247ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 95ms
+ GET /admin 200 in 45ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 142ms
+ GET /admin 200 in 51ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 116ms
+ GET /admin 200 in 56ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 241ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 236ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052964854&r=0.9279742439944096
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052964855&r=0.5355847002368368
+Failed to fetch products index: 404 Not Found
+Failed to fetch products index: 404 Not Found
+Categories already exist, skipping initialization
+ GET /api/migrate-categories 200 in 325ms
+ GET /api/migrate-categories 200 in 328ms
+ GET /api/categories?format=flat&initDefaults=true 200 in 334ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 486ms
+ GET /api/categories?format=tree 200 in 261ms
+ GET /api/categories?format=tree 200 in 262ms
+ GET /admin 200 in 59ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 241ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 224ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052968311&r=0.7353262714341722
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052968312&r=0.9660408403727625
+Failed to fetch products index: 404 Not Found
+Failed to fetch products index: 404 Not Found
+ GET /api/migrate-categories 200 in 314ms
+ GET /api/migrate-categories 200 in 317ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 491ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 540ms
+ GET /api/categories?format=tree 200 in 265ms
+ GET /api/categories?format=tree 200 in 259ms
+ GET /admin 200 in 64ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 273ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 225ms
+ GET /admin 200 in 52ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 151ms
+ GET /admin 200 in 49ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 132ms
+ GET /admin 200 in 63ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 126ms
+ GET /admin 200 in 97ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 238ms
+ GET /favicon.ico?favicon.0b3bf435.ico 200 in 225ms
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052976489&r=0.7956400442128628
+Fetching products from: https://oletza2nzhpv2x8n.public.blob.vercel-storage.com/products-index.json?t=1761052976490&r=0.4166364732363619
+Failed to fetch products index: 404 Not Found
+Failed to fetch products index: 404 Not Found
+ GET /api/migrate-categories 200 in 399ms
+ GET /api/migrate-categories 200 in 466ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 633ms
+Default categories initialized successfully
+ GET /api/categories?format=flat&initDefaults=true 200 in 735ms
+ GET /api/categories?format=tree 200 in 262ms
+ GET /api/categories?format=tree 200 in 260ms
+ ✓ Compiled in 24ms
+ GET /admin 200 in 43ms
+ ✓ Compiled in 22ms
+ GET /admin 200 in 30ms
+ GET /admin 200 in 30ms
+ GET /admin 200 in 27ms
+ ✓ Compiled in 19ms
+ GET /admin 200 in 37ms
+ ✓ Compiled in 21ms
+ GET /admin 200 in 39ms
+ GET /admin 200 in 33ms
+ GET /admin 200 in 27ms
+ ✓ Compiled in 23ms
+ GET /admin 200 in 30ms
+ GET /admin 200 in 28ms
+ ✓ Compiled in 19ms
+ GET /admin 200 in 50ms
+ GET /admin 200 in 29ms
+ ✓ Compiled in 21ms
+[?25h

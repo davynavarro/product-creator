@@ -16,9 +16,9 @@ interface ProductIndexItem {
   };
 }
 
-// Disable caching for this page
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Enable smart caching for this page - revalidate when content changes
+export const dynamic = 'auto';
+export const revalidate = 60; // Revalidate every 60 seconds max
 
 export default async function ProductsPage() {
   let products: ProductIndexItem[] = [];
