@@ -1,9 +1,10 @@
 'use client';
 
 import Image from 'next/image';
-import { ShoppingCart, Heart, Share2, ArrowLeft, Trash2 } from 'lucide-react';
+import { Heart, Share2, ArrowLeft, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import AddToCartButton from '@/components/cart/AddToCartButton';
 
 interface ProductData {
   productName: string;
@@ -142,10 +143,21 @@ export default function ProductPage({ productData, imageUrl, productId, onBack }
 
             {/* Add to Cart */}
             <div className="flex space-x-4">
-              <button className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2">
-                <ShoppingCart className="h-5 w-5" />
-                <span>Add to Cart</span>
-              </button>
+              <div className="flex-1">
+                <AddToCartButton
+                  product={{
+                    id: productId || '',
+                    productName: productData.productName,
+                    slug: productData.productName.toLowerCase().replace(/\s+/g, '-'),
+                    imageUrl: imageUrl,
+                    pricing: productData.pricing,
+                    category: productData.category,
+                  }}
+                  size="lg"
+                  showQuantitySelector={true}
+                  className="w-full justify-center"
+                />
+              </div>
               <button className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                 <Heart className="h-5 w-5 text-gray-600" />
               </button>

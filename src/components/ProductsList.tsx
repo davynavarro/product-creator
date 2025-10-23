@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Trash2, Check, Search, X } from 'lucide-react';
 import { SimpleCategorySelect } from './CategorySelector';
+import AddToCartButton from '@/components/cart/AddToCartButton';
 
 interface ProductIndexItem {
   id: string;
@@ -545,7 +546,7 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
                     </span>
                   </div>
                   
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-3">
                     <span className="text-lg font-bold text-gray-900">
                       {formatPrice(product.pricing.price, product.pricing.currency)}
                     </span>
@@ -556,6 +557,19 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
                       View →
                     </Link>
                   </div>
+                  
+                  <AddToCartButton
+                    product={{
+                      id: product.id,
+                      productName: product.productName,
+                      slug: product.slug,
+                      imageUrl: product.imageUrl,
+                      pricing: product.pricing,
+                      category: product.category,
+                    }}
+                    size="sm"
+                    className="w-full"
+                  />
                 </div>
               </div>
             ))}

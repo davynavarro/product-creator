@@ -7,15 +7,15 @@ import {
 } from '@/lib/blob-storage';
 
 type Params = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 // GET /api/categories/[id] - Get a specific category
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const categories = await getCategoriesFromBlob();
     const category = categories.find(cat => cat.id === id);
 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 // PUT /api/categories/[id] - Update a category
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { name, description, parentId, isActive } = body;
 
@@ -106,7 +106,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 // DELETE /api/categories/[id] - Delete a category
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     
     const handleProducts = searchParams.get('handleProducts') as 'reassign' | 'uncategorized' | null;

@@ -6,7 +6,6 @@ import {
   initializeDefaultCategories,
   getCategoryPath,
   type Category,
-  type CategoryTree,
 } from '@/lib/blob-storage';
 
 const openai = new OpenAI({
