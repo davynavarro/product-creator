@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { ArrowRight, Save } from 'lucide-react';
 
 interface ShippingData {
   firstName: string;
@@ -22,9 +23,48 @@ interface ShippingFormProps {
 }
 
 export default function ShippingForm({ data, onUpdate, onNext }: ShippingFormProps) {
+  const { data: session } = useSession();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saveToProfile, setSaveToProfile] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const saveAddressToProfile = async () => {
+    if (!session?.user?.email) return;
+
+    try {
+      setIsSaving(true);
+      const response = await fetch('/api/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile: {
+            shippingAddress: {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              address1: data.address,
+              city: data.city,
+              state: data.state,
+              postalCode: data.zipCode,
+              country: data.country,
+              phone: data.phone,
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save address');
+      }
+    } catch (error) {
+      console.error('Error saving address to profile:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
@@ -46,6 +86,10 @@ export default function ShippingForm({ data, onUpdate, onNext }: ShippingFormPro
     setErrors(newErrors);
     
     if (Object.keys(newErrors).length === 0) {
+      // Save to profile if requested
+      if (saveToProfile) {
+        await saveAddressToProfile();
+      }
       onNext();
     }
   };
@@ -243,13 +287,31 @@ export default function ShippingForm({ data, onUpdate, onNext }: ShippingFormPro
           </select>
         </div>
 
+        {/* Save to Profile Option */}
+        {session && (
+          <div className="flex items-center space-x-3 pt-4 border-t border-gray-200">
+            <input
+              type="checkbox"
+              id="saveToProfile"
+              checked={saveToProfile}
+              onChange={(e) => setSaveToProfile(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="saveToProfile" className="flex items-center text-sm font-medium text-gray-700">
+              <Save className="h-4 w-4 mr-1" />
+              Save this address to my profile for future orders
+            </label>
+          </div>
+        )}
+
         {/* Submit Button */}
         <div className="flex justify-end pt-4">
           <button
             type="submit"
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            disabled={isSaving}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
           >
-            Continue to Payment
+            {isSaving ? 'Saving...' : 'Continue to Payment'}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useCart } from '@/contexts/CartContext';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, CreditCard, Truck } from 'lucide-react';
+import { ArrowLeft, CheckCircle, CreditCard, Truck, User } from 'lucide-react';
 import Image from 'next/image';
 import ShippingForm from '@/components/checkout/ShippingForm';
 import StripePaymentForm from '@/components/checkout/StripePaymentForm';
 import OrderReview from '@/components/checkout/OrderReview';
+import { UserProfile } from '@/types/user';
 
 type CheckoutStep = 'shipping' | 'payment' | 'review';
 
@@ -41,9 +43,13 @@ interface CheckoutData {
 
 export default function CheckoutPage() {
   const { state } = useCart();
+  const { data: session } = useSession();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
   const [paymentData, setPaymentData] = useState<{ paymentIntentId: string; [key: string]: unknown } | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [checkoutData, setCheckoutData] = useState<CheckoutData>({
     shipping: {
       firstName: '',
@@ -67,6 +73,50 @@ export default function CheckoutPage() {
     },
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Load user profile for auto-fill
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!session?.user?.email || profileLoaded) return;
+      
+      try {
+        setProfileLoading(true);
+        const response = await fetch('/api/profile');
+        const data = await response.json();
+        
+        if (data.success && data.profile) {
+          setUserProfile(data.profile);
+          
+          // Auto-fill shipping information if available and user preference allows
+          if (data.profile.shippingAddress && data.profile.paymentPreferences.autoFillShipping) {
+            const addr = data.profile.shippingAddress;
+            setCheckoutData(prev => ({
+              ...prev,
+              shipping: {
+                firstName: addr.firstName || '',
+                lastName: addr.lastName || '',
+                email: session.user?.email || '',
+                phone: addr.phone || '',
+                address: addr.address1 || '',
+                city: addr.city || '',
+                state: addr.state || '',
+                zipCode: addr.postalCode || '',
+                country: addr.country || 'US',
+              },
+            }));
+          }
+        }
+        setProfileLoaded(true);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        setProfileLoaded(true);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadUserProfile();
+  }, [session, profileLoaded]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -212,11 +262,45 @@ export default function CheckoutPage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             {currentStep === 'shipping' && (
-              <ShippingForm
-                data={checkoutData.shipping}
-                onUpdate={(data) => handleDataUpdate('shipping', data)}
-                onNext={() => handleStepChange('payment')}
-              />
+              <div className="space-y-4">
+                {/* Profile Auto-fill Indicator */}
+                {session && userProfile && userProfile.paymentPreferences.autoFillShipping && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <User className="h-5 w-5 text-blue-600 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">
+                          Information pre-filled from your profile
+                        </p>
+                        <p className="text-sm text-blue-700">
+                          You can edit these details or{' '}
+                          <button
+                            onClick={() => router.push('/profile')}
+                            className="underline hover:no-underline"
+                          >
+                            update your profile
+                          </button>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {profileLoading && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                      <p className="text-sm text-gray-700">Loading your saved information...</p>
+                    </div>
+                  </div>
+                )}
+
+                <ShippingForm
+                  data={checkoutData.shipping}
+                  onUpdate={(data) => handleDataUpdate('shipping', data)}
+                  onNext={() => handleStepChange('payment')}
+                />
+              </div>
             )}
             
             {currentStep === 'payment' && (

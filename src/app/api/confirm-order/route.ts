@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { put } from '@vercel/blob';
 import { CartItem } from '@/contexts/CartContext';
 
@@ -38,6 +40,9 @@ interface OrderData {
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the user session to ensure authenticated orders
+    const session = await getServerSession(authOptions);
+    
     const {
       paymentIntentId,
       checkoutData,
@@ -119,6 +124,7 @@ export async function POST(request: NextRequest) {
         status: orderData.status,
         createdAt: orderData.createdAt,
         blobUrl: orderBlob.url,
+        userId: session?.user?.email || orderData.customerInfo.email, // Add user ID for filtering
       });
 
       // Save updated index
