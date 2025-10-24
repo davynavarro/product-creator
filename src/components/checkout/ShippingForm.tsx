@@ -240,6 +240,7 @@ export default function ShippingForm({ data, onUpdate, onNext }: ShippingFormPro
             >
               <option value="">Select state</option>
               <option value="CA">California</option>
+              <option value="IL">Illinois</option>
               <option value="NY">New York</option>
               <option value="TX">Texas</option>
               <option value="FL">Florida</option>
