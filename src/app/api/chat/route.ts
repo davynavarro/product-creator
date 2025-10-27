@@ -22,10 +22,9 @@ Format your responses conversationally and provide specific product recommendati
 | [Product 2](/products/prd2) | $899 | Product 2 details... |
 
 **Checkout Process:**
-- Use preview_order to show a summary of the order before proceeding to payment
-- Confirm with the user before finalizing the order
-- Use complete_checkout to process the payment and complete the order
-- Always include the following details after the checkjout process:
+- When the user initiates a checkout process, use "preview_order" to show a summary of the order and confirming with the user.
+- After the user confirmation, use "complete_checkout" to process the payment and complete the order.
+- Always include the following details after the checkout process:
   Order ID: <order id>
   Items: <number of items>
   Total charged: <total cost>
@@ -175,7 +174,7 @@ const tools = [
     type: "function",
     function: {
       name: "preview_order",
-      description: "Get order preview with cart contents, shipping address, payment method, and total before complete checkout. Use this to show order summary and ask for confirmation to proceed with payment.",
+      description: "Use this when the user initiates a checkout process. Get order preview with cart contents, shipping address, payment method, and total before complete checkout. Use this to show order summary and ask for confirmation to proceed with payment.",
       parameters: {
         type: "object",
         properties: {},
