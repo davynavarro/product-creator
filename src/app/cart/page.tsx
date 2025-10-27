@@ -1,6 +1,7 @@
 'use client';
 
 import { useCart, formatPrice, CartItem } from '@/contexts/CartContext';
+import { calculateOrderTotals } from '@/lib/order-calculations';
 import { Plus, Minus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -78,7 +79,6 @@ export default function CartPage() {
               <OrderSummary
                 items={state.items}
                 totalItems={state.totalItems}
-                totalAmount={state.totalAmount}
                 currency={state.currency}
               />
             </div>
@@ -213,15 +213,12 @@ function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardProps) {
 interface OrderSummaryProps {
   items: CartItem[];
   totalItems: number;
-  totalAmount: number;
   currency: string;
 }
 
-function OrderSummary({ totalItems, totalAmount, currency }: OrderSummaryProps) {
-  const subtotal = totalAmount;
-  const shipping = subtotal > 50 ? 0 : 9.99; // Free shipping over $50
-  const tax = subtotal * 0.08; // 8% tax
-  const total = subtotal + shipping + tax;
+function OrderSummary({ items, totalItems, currency }: OrderSummaryProps) {
+  // Calculate totals using utility function
+  const orderTotals = calculateOrderTotals(items);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-8">
@@ -230,39 +227,39 @@ function OrderSummary({ totalItems, totalAmount, currency }: OrderSummaryProps) 
       <div className="space-y-3 mb-4">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Subtotal ({totalItems} items)</span>
-          <span className="font-medium">{formatPrice(subtotal, currency)}</span>
+          <span className="font-medium">{formatPrice(orderTotals.subtotal, currency)}</span>
         </div>
         
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Shipping</span>
           <span className="font-medium">
-            {shipping === 0 ? (
+            {orderTotals.shipping === 0 ? (
               <span className="text-green-600">Free</span>
             ) : (
-              formatPrice(shipping, currency)
+              formatPrice(orderTotals.shipping, currency)
             )}
           </span>
         </div>
         
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Tax</span>
-          <span className="font-medium">{formatPrice(tax, currency)}</span>
+          <span className="font-medium">{formatPrice(orderTotals.tax, currency)}</span>
         </div>
         
         <div className="border-t pt-3">
           <div className="flex justify-between">
             <span className="text-lg font-semibold text-gray-900">Total</span>
             <span className="text-lg font-bold text-blue-600">
-              {formatPrice(total, currency)}
+              {formatPrice(orderTotals.total, currency)}
             </span>
           </div>
         </div>
       </div>
 
-      {subtotal > 0 && subtotal < 50 && (
+      {orderTotals.subtotal > 0 && orderTotals.subtotal < 50 && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
-            Add {formatPrice(50 - subtotal, currency)} more for free shipping!
+            Add {formatPrice(50 - orderTotals.subtotal, currency)} more for free shipping!
           </p>
         </div>
       )}

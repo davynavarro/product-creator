@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { PaymentMethodManager } from '@/components/PaymentMethodManager';
 import { User, Mail, Calendar, Shield, MapPin, CreditCard, Settings, Save, AlertCircle } from 'lucide-react';
 import { UserProfile, Address, PaymentPreferences } from '@/types/user';
 
@@ -266,27 +267,41 @@ export default function ProfilePage() {
 
                 {/* Billing & Payment Tab */}
                 {activeTab === 'billing' && (
-                  <div className="space-y-6">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        id="useBillingAsShipping"
-                        checked={useBillingAsShipping}
-                        onChange={(e) => setUseBillingAsShipping(e.target.checked)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="useBillingAsShipping" className="text-sm font-medium text-gray-700">
-                        Use shipping address as billing address
-                      </label>
+                  <div className="space-y-8">
+                    {/* Payment Methods Section */}
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Methods</h3>
+                      <div className="border border-gray-200 rounded-lg p-6">
+                        <PaymentMethodManager />
+                      </div>
                     </div>
 
-                    {!useBillingAsShipping && (
-                      <AddressForm
-                        title="Billing Address"
-                        address={billingAddress}
-                        onChange={setBillingAddress}
-                      />
-                    )}
+                    {/* Billing Address Section */}
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Billing Address</h3>
+                      <div className="border border-gray-200 rounded-lg p-6">
+                        <div className="flex items-center space-x-3 mb-6">
+                          <input
+                            type="checkbox"
+                            id="useBillingAsShipping"
+                            checked={useBillingAsShipping}
+                            onChange={(e) => setUseBillingAsShipping(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor="useBillingAsShipping" className="text-sm font-medium text-gray-700">
+                            Use shipping address as billing address
+                          </label>
+                        </div>
+
+                        {!useBillingAsShipping && (
+                          <AddressForm
+                            title="Billing Address"
+                            address={billingAddress}
+                            onChange={setBillingAddress}
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 

@@ -1,6 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { calculateOrderTotals } from '@/lib/order-calculations';
+import Stripe from 'stripe';
+
+// System prompt for the AI assistant
+const SYSTEM_PROMPT = `
+You are a helpful shopping assistant for an e-commerce platform with autonomous checkout capabilities.
+
+**Core Functions:**
+- Search and recommend products based on user needs
+- Add products to user's cart (single items or multiple items at once)
+- Complete purchases on user's behalf when requested
+
+**Product Recommendations:**
+Format your responses conversationally and provide specific product recommendations. When displaying search results, always format product names as clickable links using [Product Name](/products/product-id). Use markdown tables for multiple products:
+
+| Product | Category | Price | Description |
+|---------|----------|-------|-------------|
+| [iPhone 15](/products/abc123) | Electronics | $999 | Latest smartphone... |
+| [Samsung TV](/products/def456) | Electronics | $899 | 4K Smart TV... |
+
+**Payment Methods & Profile:**
+- The system automatically uses the user's saved shipping address and payment methods from their profile
+- If no saved information is found, guide users to complete their profile at /profile
+- Users must have both shipping address and payment methods saved in their profile for autonomous checkout
+- Multiple payment methods are supported with default selection
+
+**Example Flow:**
+User: "Proceed with my order"
+Assistant: [Use preview_order] "Here's your order summary: [details]. I'll ship to [address] and charge your saved payment method. Would you like me to proceed with this order?"
+User: "Yes, place the order"
+Assistant: [Use complete_checkout] "🎉 Order placed successfully! Your order #ORD-123 is confirmed."
+
+If profile is incomplete: "Please complete your shipping address and add a payment method in your profile settings first, then I can process your order automatically."
+
+**Cart Management:**
+- Use add_to_cart for adding single or multiple products - pass an array of items with productId and optional quantity
+- Use remove_from_cart to remove items from cart (supports removing specific quantities or entire items)
+- Use view_cart to show current cart contents
+- When users mention multiple products they want, use the bulk add function
+- When users want to remove items, use remove_from_cart with appropriate quantities
+
+**Important Guidelines:**
+- Be proactive in suggesting purchases when users show interest
+- ALWAYS use preview_order first when user wants to checkout - never go directly to complete_checkout
+- Present clear order summary with items, prices, shipping, and total
+- Ask for explicit confirmation: "Would you like me to proceed with this order?"
+- Only use complete_checkout AFTER user explicitly confirms (says "yes", "proceed", "place order", etc.)
+- Handle payment processing automatically and securely using saved payment methods
+- If payment fails, guide users to add/update payment methods
+- Provide clear order confirmations and tracking information
+- Be helpful throughout the entire shopping and purchase journey`;
 
 // Types for chat functionality
 interface ChatMessage {
@@ -11,7 +62,7 @@ interface ChatMessage {
 }
 
 interface ChatAction {
-  type: 'add_to_cart' | 'view_cart' | 'checkout' | 'view_product' | 'search_products' | 'compare_products';
+  type: 'add_to_cart' | 'view_cart' | 'remove_from_cart' | 'preview_order' | 'checkout' | 'view_product' | 'search_products' | 'compare_products';
   data?: Record<string, unknown>;
   label: string;
 }
@@ -35,21 +86,6 @@ interface UserContext {
 const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT;
 const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY;
 const AZURE_OPENAI_DEPLOYMENT_NAME = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4';
-
-
-
-// System prompt for the AI assistant
-const SYSTEM_PROMPT = `
-You are a helpful shopping assistant for an e-commerce platform.
-
-Format your responses in a conversational way, and provide specific product recommendations based on the search results. When displaying search results, always format product names as clickable links to their product pages using the format [Product Name](/products/product-id). Use markdown tables to display product information in a structured format when showing multiple products. For example:
-
-| Product | Category | Price | Description |
-|---------|----------|-------|-------------|
-| [iPhone 15](/products/abc123) | Electronics | $999 | Latest smartphone... |
-| [Samsung TV](/products/def456) | Electronics | $899 | 4K Smart TV... |
-
-Always make product names clickable links to their respective product pages using the format: [Product Name](/products/product-id)`;
 
 // Define available tools for the AI
 const tools = [
@@ -78,20 +114,30 @@ const tools = [
     type: "function",
     function: {
       name: "add_to_cart",
-      description: "Add a single product to the user's shopping cart with specified quantity. Be sure to use this multiple times to add different products.",
+      description: "Add one or more products to the user's shopping cart. Can add a single product or multiple products at once.",
       parameters: {
         type: "object",
         properties: {
-          productId: {
-            type: "string",
-            description: "The ID of the product to add to cart"
-          },
-          quantity: {
-            type: "number",
-            description: "The quantity of the product to add (default: 1)"
+          items: {
+            type: "array",
+            description: "Array of products to add to cart. For single item, use array with one item.",
+            items: {
+              type: "object",
+              properties: {
+                productId: {
+                  type: "string",
+                  description: "The ID of the product to add to cart"
+                },
+                quantity: {
+                  type: "number",
+                  description: "The quantity of the product to add (default: 1)"
+                }
+              },
+              required: ["productId"]
+            }
           }
         },
-        required: ["productId"]
+        required: ["items"]
       }
     }
   },
@@ -104,6 +150,70 @@ const tools = [
         type: "object",
         properties: {},
         required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "remove_from_cart",
+      description: "Remove one or more items from the user's shopping cart. Can remove specific quantities or entire items.",
+      parameters: {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            description: "Array of items to remove from cart",
+            items: {
+              type: "object",
+              properties: {
+                productId: {
+                  type: "string",
+                  description: "The ID of the product to remove from cart"
+                },
+                quantity: {
+                  type: "number",
+                  description: "The quantity to remove. If not specified or if quantity >= current quantity, removes the entire item from cart"
+                },
+                removeAll: {
+                  type: "boolean",
+                  description: "If true, removes all quantities of this item from cart"
+                }
+              },
+              required: ["productId"]
+            }
+          }
+        },
+        required: ["items"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "preview_order",
+      description: "Get order preview with cart contents, shipping address, payment method, and total before checkout. Use this to show order summary and ask for confirmation.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "complete_checkout",
+      description: "Complete the purchase of items in the user's cart using their saved profile information. ONLY use this AFTER the user has explicitly confirmed they want to proceed with the order.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderNote: {
+            type: "string",
+            description: "Optional note for the order"
+          }
+        },
+        required: ["orderNote"]
       }
     }
   }
@@ -144,10 +254,9 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
     }
 
     case 'add_to_cart': {
-      const productId = parameters.productId as string;
-      const quantity = (parameters.quantity as number) || 1;
+      const items = parameters.items as Array<{ productId: string; quantity?: number }>;
       
-      console.log('add_to_cart called with:', { productId, quantity, userEmail });
+      console.log('add_to_cart called with:', { items: items.length, userEmail });
       
       try {
         // First, get product details using the products API
@@ -160,14 +269,22 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
         }
         
         const products = await productsResponse.json();
-        const product = products.find((p: { id: string }) => p.id === productId);
         
-        if (!product) {
-          console.error('Product not found:', productId);
-          return JSON.stringify({ error: 'Product not found' });
+        // Validate all products exist
+        const processedItems = [];
+        for (const item of items) {
+          const product = products.find((p: { id: string }) => p.id === item.productId);
+          if (!product) {
+            console.error('Product not found:', item.productId);
+            return JSON.stringify({ error: `Product not found: ${item.productId}` });
+          }
+          processedItems.push({
+            product,
+            quantity: item.quantity || 1
+          });
         }
         
-        console.log('Found product:', product.productName);
+        console.log('All products validated, processing cart update');
         
         // Use user's email as session ID
         const sessionId = userEmail || 'anonymous-user';
@@ -176,33 +293,39 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
         // Get current cart items
         const cartResponse = await fetch(`${baseUrl}/api/cart?sessionId=${sessionId}`);
         const cartData = cartResponse.ok ? await cartResponse.json() : { items: [] };
-        const currentItems = cartData.items || [];
+        const updatedItems = [...(cartData.items || [])];
         
-        console.log('Current cart items:', currentItems.length);
+        console.log('Current cart items:', updatedItems.length);
         
-        // Check if item already exists in cart
-        const existingItemIndex = currentItems.findIndex((item: { id: string }) => item.id === productId);
-        
-        let updatedItems;
-        if (existingItemIndex >= 0) {
-          // Update quantity of existing item
-          updatedItems = [...currentItems];
-          updatedItems[existingItemIndex].quantity += quantity;
-          console.log('Updated existing item quantity');
-        } else {
-          // Add new item to cart
-          const cartItem = {
-            id: productId,
-            productName: product.productName || product.name || 'Unknown Product',
-            slug: product.slug || '',
-            imageUrl: product.imageUrl || '',
-            price: Number(product.pricing?.price || product.price || 0),
-            currency: 'USD',
-            quantity: Number(quantity),
-            category: product.category || 'General'
-          };
-          updatedItems = [...currentItems, cartItem];
-          console.log('Added new item to cart:', cartItem.productName);
+        // Process each item
+        const addedProducts = [];
+        for (const { product, quantity } of processedItems) {
+          const existingItemIndex = updatedItems.findIndex((item: { id: string }) => item.id === product.id);
+          
+          if (existingItemIndex >= 0) {
+            // Update quantity of existing item
+            updatedItems[existingItemIndex].quantity += quantity;
+            console.log(`Updated existing item: ${product.productName} (+${quantity})`);
+          } else {
+            // Add new item to cart
+            const cartItem = {
+              id: product.id,
+              productName: product.productName || product.name || 'Unknown Product',
+              slug: product.slug || '',
+              imageUrl: product.imageUrl || '',
+              price: Number(product.pricing?.price || product.price || 0),
+              currency: 'USD',
+              quantity: Number(quantity),
+              category: product.category || 'General'
+            };
+            updatedItems.push(cartItem);
+            console.log('Added new item to cart:', cartItem.productName);
+          }
+          
+          addedProducts.push({
+            name: product.productName || product.name,
+            quantity: quantity
+          });
         }
         
         // Save updated cart
@@ -219,24 +342,148 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
         if (!saveResponse.ok) {
           const errorData = await saveResponse.text();
           console.error('Cart save error:', saveResponse.status, errorData);
-          return JSON.stringify({ error: `Failed to add item to cart: ${errorData}` });
+          return JSON.stringify({ error: `Failed to add items to cart: ${errorData}` });
         }
         
         const saveResult = await saveResponse.json();
         console.log('Cart save successful:', saveResult);
         
+        // Create appropriate response message
+        let message: string;
+        if (items.length === 1) {
+          // Single item message
+          const item = addedProducts[0];
+          message = `Added ${item.quantity} x ${item.name} to your cart (session: ${sessionId}). Total items: ${saveResult.totalItems}`;
+        } else {
+          // Multiple items message
+          const itemsText = addedProducts.map(item => `${item.quantity} x ${item.name}`).join(', ');
+          message = `Added ${addedProducts.length} products to your cart: ${itemsText} (session: ${sessionId}). Total items: ${saveResult.totalItems}`;
+        }
+        
         return JSON.stringify({
           success: true,
-          message: `Added ${quantity} x ${product.productName || product.name} to your cart (session: ${sessionId}). Total items: ${saveResult.totalItems}`,
+          message: message,
           totalItems: saveResult.totalItems,
           cartUrl: '/cart',
-          sessionId: sessionId  // Include session ID for debugging
+          sessionId: sessionId,
+          addedProducts: addedProducts
         });
         
       } catch (error) {
         console.error('Error adding to cart:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        return JSON.stringify({ error: `Failed to add item to cart: ${errorMessage}` });
+        return JSON.stringify({ error: `Failed to add items to cart: ${errorMessage}` });
+      }
+    }
+
+    case 'remove_from_cart': {
+      const items = parameters.items as Array<{ productId: string; quantity?: number; removeAll?: boolean }>;
+      
+      console.log('remove_from_cart called with:', { items: items.length, userEmail });
+      
+      try {
+        // Use user's email as session ID
+        const sessionId = userEmail || 'anonymous-user';
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        
+        // Get current cart items
+        const cartResponse = await fetch(`${baseUrl}/api/cart?sessionId=${sessionId}`);
+        const cartData = cartResponse.ok ? await cartResponse.json() : { items: [] };
+        // eslint-disable-next-line prefer-const
+        let updatedItems = [...(cartData.items || [])];
+        
+        console.log('Current cart items before removal:', updatedItems.length);
+        
+        // Process each item removal
+        const removedProducts = [];
+        for (const removeItem of items) {
+          const existingItemIndex = updatedItems.findIndex((item: { id: string }) => item.id === removeItem.productId);
+          
+          if (existingItemIndex >= 0) {
+            const currentItem = updatedItems[existingItemIndex];
+            const currentQuantity = currentItem.quantity;
+            
+            if (removeItem.removeAll || !removeItem.quantity || removeItem.quantity >= currentQuantity) {
+              // Remove entire item
+              updatedItems.splice(existingItemIndex, 1);
+              removedProducts.push({
+                name: currentItem.productName,
+                quantity: currentQuantity,
+                action: 'removed completely'
+              });
+              console.log(`Completely removed item: ${currentItem.productName} (${currentQuantity} units)`);
+            } else {
+              // Reduce quantity
+              updatedItems[existingItemIndex].quantity -= removeItem.quantity;
+              removedProducts.push({
+                name: currentItem.productName,
+                quantity: removeItem.quantity,
+                action: 'reduced quantity'
+              });
+              console.log(`Reduced quantity: ${currentItem.productName} (-${removeItem.quantity}, now ${updatedItems[existingItemIndex].quantity})`);
+            }
+          } else {
+            console.log(`Item not found in cart: ${removeItem.productId}`);
+            removedProducts.push({
+              name: removeItem.productId,
+              quantity: 0,
+              action: 'not found'
+            });
+          }
+        }
+        
+        // Save updated cart
+        console.log('Saving cart with', updatedItems.length, 'items after removal');
+        const saveResponse = await fetch(`${baseUrl}/api/cart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            items: updatedItems
+          })
+        });
+        
+        if (!saveResponse.ok) {
+          const errorData = await saveResponse.text();
+          console.error('Cart save error:', saveResponse.status, errorData);
+          return JSON.stringify({ error: `Failed to update cart: ${errorData}` });
+        }
+        
+        const saveResult = await saveResponse.json();
+        console.log('Cart update successful:', saveResult);
+        
+        // Create a summary message
+        const validRemovals = removedProducts.filter(item => item.action !== 'not found');
+        const notFoundItems = removedProducts.filter(item => item.action === 'not found');
+        
+        let message = '';
+        if (validRemovals.length > 0) {
+          const itemsText = validRemovals.map(item => 
+            item.action === 'removed completely' 
+              ? `${item.name} (removed completely)` 
+              : `${item.quantity} x ${item.name} (reduced)`
+          ).join(', ');
+          message = `Updated cart: ${itemsText}`;
+        }
+        
+        if (notFoundItems.length > 0) {
+          const notFoundText = notFoundItems.map(item => item.name).join(', ');
+          message += (message ? '. ' : '') + `Items not found in cart: ${notFoundText}`;
+        }
+        
+        return JSON.stringify({
+          success: true,
+          message: message || 'No changes made to cart',
+          totalItems: saveResult.totalItems,
+          cartUrl: '/cart',
+          sessionId: sessionId,
+          removedProducts: removedProducts
+        });
+        
+      } catch (error) {
+        console.error('Error removing items from cart:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return JSON.stringify({ error: `Failed to remove items from cart: ${errorMessage}` });
       }
     }
 
@@ -263,6 +510,260 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
       } catch (error) {
         console.error('Error viewing cart:', error);
         return JSON.stringify({ error: 'Failed to fetch cart contents' });
+      }
+    }
+
+    case 'preview_order': {
+      try {
+        if (!userEmail) {
+          return JSON.stringify({ error: 'User must be logged in to preview order' });
+        }
+
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        const sessionId = userEmail;
+
+        // Get cart contents
+        const cartResponse = await fetch(`${baseUrl}/api/cart?sessionId=${sessionId}`);
+        if (!cartResponse.ok) {
+          return JSON.stringify({ error: 'Failed to fetch cart' });
+        }
+        
+        const cartData = await cartResponse.json();
+        const cartItems = cartData.items || [];
+        
+        if (cartItems.length === 0) {
+          return JSON.stringify({ error: 'Cart is empty. Please add items before checkout.' });
+        }
+
+        // Get user profile for shipping and payment info
+        const profileResponse = await fetch(`${baseUrl}/api/profile?userEmail=${encodeURIComponent(userEmail)}`);
+        let shippingAddress = null;
+        let hasPaymentMethod = false;
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          shippingAddress = profileData.profile?.shippingAddress;
+          
+          // Check if user has payment methods in Stripe
+          try {
+            const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+              apiVersion: '2025-09-30.clover',
+            });
+            const customers = await stripe.customers.list({
+              email: userEmail,
+              limit: 1,
+            });
+            
+            if (customers.data.length > 0) {
+              const paymentMethods = await stripe.paymentMethods.list({
+                customer: customers.data[0].id,
+                type: 'card',
+              });
+              hasPaymentMethod = paymentMethods.data.length > 0;
+            }
+          } catch (stripeError) {
+            console.log('Could not check payment methods:', stripeError);
+          }
+        }
+
+        // Calculate order totals using the utility function
+        const orderSummary = calculateOrderTotals(cartItems);
+
+        return JSON.stringify({
+          success: true,
+          cartItems: cartItems,
+          totalItems: cartData.totalItems || 0,
+          orderSummary: orderSummary,
+          shippingAddress: shippingAddress,
+          hasPaymentMethod: hasPaymentMethod,
+          readyForCheckout: !!(shippingAddress?.firstName && shippingAddress?.address1 && hasPaymentMethod)
+        });
+
+      } catch (error) {
+        console.error('Error previewing order:', error);
+        return JSON.stringify({ error: 'Failed to preview order' });
+      }
+    }
+
+    case 'complete_checkout': {
+      try {
+        const orderNote = parameters.orderNote as string | undefined;
+        
+        if (!userEmail) {
+          return JSON.stringify({ error: 'User must be logged in to complete checkout' });
+        }
+
+        console.log('Agent completing checkout for user:', userEmail);
+
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+        const sessionId = userEmail;
+
+        // Step 1: Get current cart
+        const cartResponse = await fetch(`${baseUrl}/api/cart?sessionId=${sessionId}`);
+        if (!cartResponse.ok) {
+          return JSON.stringify({ error: 'Failed to fetch cart' });
+        }
+        
+        const cartData = await cartResponse.json();
+        const cartItems = cartData.items || [];
+        
+        if (cartItems.length === 0) {
+          return JSON.stringify({ error: 'Cart is empty. Please add items before checkout.' });
+        }
+
+        // Step 2: Get stored shipping info from user's profile
+        console.log('Fetching user profile for shipping information...');
+        
+        let shippingInfo;
+        try {
+          // Pass userEmail as query parameter for server-side profile retrieval
+          const profileResponse = await fetch(`${baseUrl}/api/profile?userEmail=${encodeURIComponent(userEmail)}`);
+          
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            console.log('Profile data retrieved in chat:', JSON.stringify(profileData, null, 2));
+            const storedAddress = profileData.profile?.shippingAddress;
+            
+            console.log('Shipping address from profile:', JSON.stringify(storedAddress, null, 2));
+            
+            if (storedAddress && storedAddress.firstName && storedAddress.address1) {
+              shippingInfo = {
+                firstName: storedAddress.firstName,
+                lastName: storedAddress.lastName,
+                address: storedAddress.address1,
+                city: storedAddress.city,
+                state: storedAddress.state,
+                zipCode: storedAddress.postalCode,
+                phone: storedAddress.phone || ''
+              };
+              console.log('Using stored shipping address for checkout:', JSON.stringify(shippingInfo, null, 2));
+            } else {
+              console.log('Shipping address validation failed:', {
+                hasAddress: !!storedAddress,
+                hasFirstName: !!(storedAddress?.firstName),
+                hasAddress1: !!(storedAddress?.address1),
+                actualFields: storedAddress ? Object.keys(storedAddress) : []
+              });
+            }
+          } else {
+            console.log('Profile API response not OK:', profileResponse.status);
+          }
+        } catch (profileError) {
+          console.log('Could not fetch stored profile:', profileError);
+        }
+        
+        if (!shippingInfo) {
+          return JSON.stringify({ 
+            error: 'No shipping address found in your profile. Please save your shipping address in your profile settings first, then try again.',
+            requiresProfile: true
+          });
+        }
+
+        // Step 3: Try direct checkout with saved payment methods first
+        console.log('Attempting direct checkout with saved payment methods...');
+        
+        const directCheckoutResponse = await fetch(`${baseUrl}/api/direct-checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cartItems,
+            shippingInfo,
+            useDefaultPaymentMethod: true,
+            orderNote: orderNote || 'Order placed via AI assistant',
+            userEmail: userEmail // Pass user email for server-side authentication
+          })
+        });
+
+        if (directCheckoutResponse.ok) {
+          // Direct checkout succeeded
+          const checkoutData = await directCheckoutResponse.json();
+          
+          // Clear the cart after successful order
+          await fetch(`${baseUrl}/api/cart`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId })
+          });
+
+          return JSON.stringify({
+            success: true,
+            message: `🎉 Order placed successfully using your saved payment method! Your order ${checkoutData.orderId} is confirmed.`,
+            orderId: checkoutData.orderId,
+            total: checkoutData.orderData.total,
+            currency: checkoutData.orderData.currency,
+            itemCount: checkoutData.orderData.items
+          });
+        }
+
+        console.log('Direct checkout failed, falling back to SPT method...');
+        
+        // Step 4: Fallback to Shared Payment Token method
+        // For demo purposes, we'll use a default payment method
+        // In production, this would use the user's stored payment method
+        const sptResponse = await fetch(`${baseUrl}/api/shared-payment-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cartItems,
+            paymentMethodId: 'pm_card_visa', // Demo payment method
+            userEmail: userEmail // Pass user email for server-side authentication
+          })
+        });
+
+        if (!sptResponse.ok) {
+          const sptError = await sptResponse.json();
+          return JSON.stringify({ 
+            error: 'Payment setup failed. Please add a payment method in your profile settings first.', 
+            details: sptError.error || 'No payment methods available'
+          });
+        }
+
+        const sptData = await sptResponse.json();
+
+        // Step 5: Complete agent checkout with SPT
+        const checkoutResponse = await fetch(`${baseUrl}/api/agent-checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shared_payment_token: sptData.shared_payment_token,
+            cartItems,
+            shippingInfo,
+            orderNote: 'Order placed via AI assistant (SPT fallback)'
+          })
+        });
+
+        if (!checkoutResponse.ok) {
+          const checkoutError = await checkoutResponse.json();
+          return JSON.stringify({ 
+            error: 'Checkout failed. Please add a payment method in your profile settings.', 
+            details: checkoutError.error || 'Payment processing error'
+          });
+        }
+
+        const checkoutData = await checkoutResponse.json();
+
+        // Step 6: Clear the cart after successful order
+        await fetch(`${baseUrl}/api/cart`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId })
+        });
+
+        return JSON.stringify({
+          success: true,
+          message: `🎉 Order placed successfully! Your order ${checkoutData.orderId} is confirmed.`,
+          orderId: checkoutData.orderId,
+          total: checkoutData.orderData.total,
+          currency: checkoutData.orderData.currency,
+          itemCount: checkoutData.orderData.items
+        });
+
+      } catch (error) {
+        console.error('Error in agent checkout:', error);
+        return JSON.stringify({ 
+          error: 'Checkout process failed', 
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     }
     

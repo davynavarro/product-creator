@@ -129,7 +129,8 @@ export const BUCKETS = {
   IMAGES: 'images', 
   CART: 'cart',
   CATEGORIES: 'categories',
-  ORDERS: 'orders'
+  ORDERS: 'orders',
+  PROFILES: 'profiles'
 } as const;
 
 // File paths
@@ -807,11 +808,17 @@ export async function getOrderFromSupabase(orderId: string): Promise<OrderData |
 // Get orders index from Supabase
 export async function getOrdersFromSupabase(): Promise<OrderIndexItem[]> {
   try {
-    const { data, error } = await supabase.storage
+    console.log('Attempting to download orders-index.json from bucket:', BUCKETS.ORDERS);
+    const { data, error } = await supabaseAdmin.storage
       .from(BUCKETS.ORDERS)
       .download('orders-index.json');
     
-    if (error || !data) {
+    if (error) {
+      console.error('Error downloading orders index:', error);
+      return [];
+    }
+    
+    if (!data) {
       console.log('No orders index found, returning empty array');
       return [];
     }
@@ -864,5 +871,120 @@ export async function updateOrdersIndex(orderData: OrderData): Promise<void> {
   } catch (error) {
     console.error('Error updating orders index:', error);
     throw error;
+  }
+}
+
+// ========================================
+// USER PROFILE STORAGE FUNCTIONS
+// ========================================
+
+import { UserProfile } from '@/types/user';
+
+// Save user profile to Supabase
+export async function saveUserProfileToSupabase(userProfile: UserProfile): Promise<void> {
+  try {
+    const fileName = `${userProfile.email}.json`;
+    
+    const { error } = await supabaseAdmin.storage
+      .from(BUCKETS.PROFILES)
+      .upload(fileName, JSON.stringify(userProfile, null, 2), {
+        contentType: 'application/json',
+        upsert: true
+      });
+    
+    // If bucket doesn't exist, create it and try again
+    if (error && error.message.includes('Bucket not found')) {
+      console.log('Profiles bucket not found, creating it...');
+      
+      const { error: createError } = await supabaseAdmin.storage.createBucket(BUCKETS.PROFILES, {
+        public: false
+      });
+      
+      if (createError) {
+        console.error('Error creating profiles bucket:', createError);
+        throw new Error(`Failed to create profiles bucket: ${createError.message}`);
+      }
+      
+      console.log('Profiles bucket created successfully, retrying upload...');
+      
+      // Retry the upload
+      const { error: retryError } = await supabaseAdmin.storage
+        .from(BUCKETS.PROFILES)
+        .upload(fileName, JSON.stringify(userProfile, null, 2), {
+          contentType: 'application/json',
+          upsert: true
+        });
+      
+      if (retryError) {
+        console.error('Error saving profile to Supabase after bucket creation:', retryError);
+        throw new Error(`Failed to save profile after bucket creation: ${retryError.message}`);
+      }
+    } else if (error) {
+      console.error('Error saving profile to Supabase:', error);
+      throw new Error(`Failed to save profile: ${error.message}`);
+    }
+    
+    console.log(`Profile for ${userProfile.email} saved successfully to Supabase`);
+  } catch (error) {
+    console.error('Error in saveUserProfileToSupabase:', error);
+    throw error;
+  }
+}
+
+// Get user profile from Supabase
+export async function getUserProfileFromSupabase(email: string): Promise<UserProfile | null> {
+  try {
+    const fileName = `${email}.json`;
+    
+    console.log(`Attempting to fetch profile for: ${email} from file: ${fileName}`);
+    
+    const { data, error } = await supabaseAdmin.storage
+      .from(BUCKETS.PROFILES)
+      .download(fileName);
+    
+    if (error) {
+      // Log the specific error details
+      console.log(`Profile fetch error for ${email}:`, {
+        name: error.name,
+        message: error.message,
+        status: 'status' in error ? error.status : 'no status',
+        statusCode: 'statusCode' in error ? error.statusCode : 'no statusCode'
+      });
+      
+      // Check for various "not found" error conditions
+      const errorStr = JSON.stringify(error);
+      const hasOriginalError = 'originalError' in error && error.originalError && typeof error.originalError === 'object' && 'status' in error.originalError;
+      const originalStatus = hasOriginalError ? (error.originalError as { status: number }).status : null;
+      
+      if (error.message.includes('Object not found') || 
+          error.message.includes('Not found') ||
+          error.message.includes('does not exist') ||
+          error.message.includes('Bucket not found') ||
+          error.name === 'StorageUnknownError' ||
+          errorStr.includes('StorageUnknownError') ||
+          errorStr.includes('"statusCode":"404"') ||
+          errorStr.includes('"status":404') ||
+          errorStr.includes('__isStorageError') ||
+          originalStatus === 400) { // 400 Bad Request often means bucket doesn't exist
+        console.log(`No profile found for user: ${email} (bucket may not exist yet)`);
+        return null;
+      }
+      console.error('Profile fetch error details:', error);
+      throw new Error(`Failed to get profile: ${errorStr}`);
+    }
+    
+    const profileText = await data.text();
+    console.log(`Profile text retrieved for ${email}:`, profileText.substring(0, 200) + '...');
+    
+    const userProfile: UserProfile = JSON.parse(profileText);
+    
+    console.log(`Profile retrieved for user: ${email}`, { 
+      hasShipping: !!userProfile.shippingAddress,
+      hasBilling: !!userProfile.billingAddress 
+    });
+    return userProfile;
+  } catch (error) {
+    console.error('Error getting user profile from Supabase:', error);
+    return null;
   }
 }

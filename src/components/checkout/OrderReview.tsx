@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { CartItem } from '@/contexts/CartContext';
+import { calculateOrderTotals } from '@/lib/order-calculations';
 import Image from 'next/image';
 
 interface CheckoutData {
@@ -17,10 +18,7 @@ interface CheckoutData {
     country: string;
   };
   payment: {
-    cardNumber: string;
-    expiryDate: string;
-    cvv: string;
-    nameOnCard: string;
+    selectedPaymentMethodId?: string;
     billingAddress: {
       sameAsShipping: boolean;
       address?: string;
@@ -47,10 +45,7 @@ export default function OrderReview({
   onBack,
   isProcessing,
 }: OrderReviewProps) {
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 50 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
+  const orderTotals = calculateOrderTotals(cartItems);
 
   const { shipping: shippingInfo, payment: paymentInfo } = checkoutData;
 
@@ -138,11 +133,11 @@ export default function OrderReview({
                 <span className="text-white text-xs font-bold">CARD</span>
               </div>
               <span className="font-medium text-gray-900">
-                **** **** **** {paymentInfo.cardNumber.replace(/\s/g, '').slice(-4)}
+                {paymentInfo.selectedPaymentMethodId ? 'Saved Payment Method' : 'Payment Method'}
               </span>
             </div>
-            <p className="text-gray-600 mt-1">{paymentInfo.nameOnCard}</p>
-            <p className="text-gray-600">Expires {paymentInfo.expiryDate}</p>
+            <p className="text-gray-600 mt-1">Using saved payment method</p>
+            <p className="text-gray-600">Secure payment processing via Stripe</p>
           </div>
         </div>
 
@@ -168,27 +163,27 @@ export default function OrderReview({
           <div className="bg-gray-50 p-4 rounded-lg space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">${subtotal.toFixed(2)}</span>
+              <span className="font-medium">${orderTotals.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Shipping</span>
               <span className="font-medium">
-                {shipping === 0 ? (
+                {orderTotals.shipping === 0 ? (
                   <span className="text-green-600">Free</span>
                 ) : (
-                  `$${shipping.toFixed(2)}`
+                  `$${orderTotals.shipping.toFixed(2)}`
                 )}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Tax</span>
-              <span className="font-medium">${tax.toFixed(2)}</span>
+              <span className="font-medium">${orderTotals.tax.toFixed(2)}</span>
             </div>
             <div className="border-t pt-2">
               <div className="flex justify-between">
                 <span className="text-lg font-semibold text-gray-900">Total</span>
                 <span className="text-lg font-bold text-blue-600">
-                  ${total.toFixed(2)}
+                  ${orderTotals.total.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -234,7 +229,7 @@ export default function OrderReview({
               </>
             ) : (
               <>
-                Place Order - ${total.toFixed(2)}
+                Place Order - ${orderTotals.total.toFixed(2)}
               </>
             )}
           </button>

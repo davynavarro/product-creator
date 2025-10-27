@@ -12,15 +12,25 @@ export async function GET() {
     }
 
     const userEmail = session.user.email;
+    console.log('Fetching orders for user:', userEmail);
 
     try {
       // Fetch orders from Supabase
       const allOrders: OrderIndexItem[] = await getOrdersFromSupabase();
+      console.log('Total orders found:', allOrders.length);
+      console.log('All orders:', allOrders.map(o => ({ orderId: o.orderId, customerEmail: o.customerEmail })));
       
       // Filter orders by user email
-      const userOrders = allOrders.filter(order => 
-        order.customerEmail === userEmail
-      );
+      console.log('Filtering orders for user email:', userEmail);
+      console.log('Order emails in database:', allOrders.map(o => o.customerEmail));
+      
+      const userOrders = allOrders.filter(order => {
+        const match = order.customerEmail === userEmail;
+        console.log(`Comparing "${order.customerEmail}" === "${userEmail}": ${match}`);
+        return match;
+      });
+      console.log('User orders found:', userOrders.length);
+      console.log('Filtered user orders:', userOrders);
 
       // Sort by creation date (newest first)
       userOrders.sort((a, b) => 

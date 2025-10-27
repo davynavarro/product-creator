@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, CreditCard, Truck, User } from 'lucide-react';
 import Image from 'next/image';
 import ShippingForm from '@/components/checkout/ShippingForm';
-import StripePaymentForm from '@/components/checkout/StripePaymentForm';
+import SavedPaymentMethodForm from '@/components/checkout/SavedPaymentMethodForm';
 import OrderReview from '@/components/checkout/OrderReview';
 import { UserProfile } from '@/types/user';
 
@@ -26,10 +26,7 @@ interface CheckoutData {
     country: string;
   };
   payment: {
-    cardNumber: string;
-    expiryDate: string;
-    cvv: string;
-    nameOnCard: string;
+    selectedPaymentMethodId?: string;
     billingAddress: {
       sameAsShipping: boolean;
       address?: string;
@@ -46,7 +43,7 @@ export default function CheckoutPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
-  const [paymentData, setPaymentData] = useState<{ paymentIntentId: string; [key: string]: unknown } | null>(null);
+  const [paymentData, setPaymentData] = useState<{ paymentMethodId?: string; orderId?: string; [key: string]: unknown } | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -63,10 +60,6 @@ export default function CheckoutPage() {
       country: 'US',
     },
     payment: {
-      cardNumber: '',
-      expiryDate: '',
-      cvv: '',
-      nameOnCard: '',
       billingAddress: {
         sameAsShipping: true,
       },
@@ -143,44 +136,47 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
-    if (!paymentData?.paymentIntentId) {
-      alert('Payment information is missing. Please go back and complete payment.');
+    if (!paymentData?.paymentMethodId) {
+      alert('Payment method is missing. Please go back and select a payment method.');
       return;
     }
 
     setIsProcessing(true);
     try {
-      // Create order confirmation
-      const response = await fetch('/api/confirm-order', {
+      // Process payment using the selected saved payment method
+      const response = await fetch('/api/direct-checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          paymentIntentId: paymentData.paymentIntentId,
-          checkoutData,
           cartItems: state.items,
-          totals: {
-            subtotal: state.totalAmount,
-            shipping: 0, // Free shipping for now
-            tax: 0, // No tax calculation for now
-            total: state.totalAmount,
-            currency: state.currency,
+          shippingInfo: {
+            firstName: checkoutData.shipping.firstName,
+            lastName: checkoutData.shipping.lastName,
+            address: checkoutData.shipping.address,
+            city: checkoutData.shipping.city,
+            state: checkoutData.shipping.state,
+            zipCode: checkoutData.shipping.zipCode,
+            country: checkoutData.shipping.country,
+            phone: checkoutData.shipping.phone,
           },
+          paymentMethodId: paymentData.paymentMethodId,
+          orderNote: 'Order placed via checkout page'
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Order confirmation failed');
-      }
-
       const result = await response.json();
-      
-      // Redirect to success page with order ID
-      router.push(`/checkout/success?orderId=${result.orderId}`);
+
+      if (result.success) {
+        // Redirect to success page (cart will be cleared there)
+        router.push(`/checkout/success?orderId=${result.orderId}`);
+      } else {
+        throw new Error(result.error || 'Payment failed');
+      }
     } catch (error) {
       console.error('Order placement failed:', error);
-      alert('Order placement failed. Please try again.');
+      alert(`Order placement failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -304,9 +300,8 @@ export default function CheckoutPage() {
             )}
             
             {currentStep === 'payment' && (
-              <StripePaymentForm
+              <SavedPaymentMethodForm
                 data={checkoutData.payment}
-                shippingData={checkoutData.shipping}
                 onUpdate={(data) => handleDataUpdate('payment', data)}
                 onNext={(paymentInfo) => {
                   if (paymentInfo) {

@@ -101,16 +101,36 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE /api/cart - Clear cart for a session
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
-    // Get session from NextAuth (like sync endpoint does)
-    const session = await getServerSession(authOptions);
+    let sessionId: string;
     
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    // Try to get sessionId from request body first (for server-side calls)
+    try {
+      const body = await request.json();
+      if (body.sessionId) {
+        sessionId = body.sessionId;
+      } else {
+        // Fall back to session-based authentication
+        const session = await getServerSession(authOptions);
+        
+        if (!session?.user?.email) {
+          return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
+        
+        sessionId = session.user.email;
+      }
+    } catch {
+      // If no body or invalid JSON, use session-based authentication
+      const session = await getServerSession(authOptions);
+      
+      if (!session?.user?.email) {
+        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      }
+      
+      sessionId = session.user.email;
     }
 
-    const sessionId = session.user.email;
     await deleteCartFromSupabase(sessionId);
     
     const response = NextResponse.json({

@@ -2,28 +2,43 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { UserProfile, SaveProfileRequest, ProfileApiResponse } from '@/types/user';
+import { saveUserProfileToSupabase, getUserProfileFromSupabase } from '@/lib/supabase-storage';
 
-// In-memory storage for demo (in production, use a database)
-const userProfiles = new Map<string, UserProfile>();
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const { searchParams } = new URL(request.url);
+    const serverUserEmail = searchParams.get('userEmail');
     
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // If userEmail is provided in query params, use it (for server-side calls)
+    // Otherwise, use session authentication
+    let userEmail: string;
+    let userName: string = '';
+    let userImage: string | undefined;
+    
+    if (serverUserEmail) {
+      // Server-side call with explicit user email
+      userEmail = serverUserEmail;
+    } else {
+      // Regular client call - require session
+      const session = await getServerSession(authOptions);
+      
+      if (!session?.user?.email) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      
+      userEmail = session.user.email;
+      userName = session.user.name || '';
+      userImage = session.user.image || undefined;
     }
-
-    const userEmail = session.user.email;
-    const profile = userProfiles.get(userEmail);
+    const profile = await getUserProfileFromSupabase(userEmail);
     
     if (!profile) {
       // Return default profile structure
       const defaultProfile: UserProfile = {
         id: userEmail,
         email: userEmail,
-        name: session.user.name || '',
-        image: session.user.image || undefined,
+        name: userName,
+        image: userImage,
         useBillingAsShipping: true,
         paymentPreferences: {
           saveCards: false,
@@ -67,7 +82,7 @@ export async function POST(request: NextRequest) {
     const userEmail = session.user.email;
     
     // Get existing profile or create new one
-    const existingProfile = userProfiles.get(userEmail);
+    const existingProfile = await getUserProfileFromSupabase(userEmail);
     const now = new Date().toISOString();
     
     const updatedProfile: UserProfile = {
@@ -108,7 +123,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    userProfiles.set(userEmail, updatedProfile);
+    // Save to Supabase
+    try {
+      await saveUserProfileToSupabase(updatedProfile);
+    } catch (saveError) {
+      console.error('Error saving profile to Supabase:', saveError);
+      return NextResponse.json(
+        { error: 'Failed to save profile to storage' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
