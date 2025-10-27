@@ -1,0 +1,53 @@
+{
+  "name": "@ai-shopping/assistant",
+  "version": "1.0.0",
+  "description": "AI-powered shopping assistant for e-commerce applications with autonomous checkout capabilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "ai",
+    "shopping",
+    "assistant",
+    "ecommerce",
+    "chatbot",
+    "autonomous",
+    "checkout",
+    "react",
+    "nextjs",
+    "stripe",
+    "azure",
+    "openai"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ai-shopping-assistant"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "stripe": "^12.0.0"
+  },
+  "dependencies": {
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "typescript": "^5.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -55,7 +55,7 @@ export default function Navigation() {
             {session && (
               <>
                 <Link
-                  href="/chat"
+                  href="/ai-test"
                   className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
                 >
                   🤖 AI Assistant

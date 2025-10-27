@@ -37,7 +37,15 @@ export async function GET() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      return NextResponse.json(userOrders);
+      const response = NextResponse.json(userOrders);
+
+      // Disable all caching to ensure fresh order data
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+      response.headers.set('Surrogate-Control', 'no-store');
+
+      return response;
     } catch (fetchError) {
       console.error('Error fetching orders from Supabase:', fetchError);
       // Return empty array instead of error to gracefully handle missing data
