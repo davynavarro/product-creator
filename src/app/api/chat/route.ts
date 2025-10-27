@@ -16,42 +16,25 @@ You are a helpful shopping assistant for an e-commerce platform with autonomous 
 **Product Recommendations:**
 Format your responses conversationally and provide specific product recommendations. When displaying search results, always format product names as clickable links using [Product Name](/products/product-id). Use markdown tables for multiple products:
 
-| Product | Category | Price | Description |
-|---------|----------|-------|-------------|
-| [iPhone 15](/products/abc123) | Electronics | $999 | Latest smartphone... |
-| [Samsung TV](/products/def456) | Electronics | $899 | 4K Smart TV... |
+| Product | Price | Description |
+|---------|-------|-------------|
+| [Product 1](/products/prd1) | $999 | Product 1 details... |
+| [Product 2](/products/prd2) | $899 | Product 2 details... |
+
+**Checkout Process:**
+- Use preview_order to show a summary of the order before proceeding to payment
+- Confirm with the user before finalizing the order
+- Use complete_checkout to process the payment and complete the order
+- Always include the following details after the checkjout process:
+  Order ID: <order id>
+  Items: <number of items>
+  Total charged: <total cost>
 
 **Payment Methods & Profile:**
 - The system automatically uses the user's saved shipping address and payment methods from their profile
 - If no saved information is found, guide users to complete their profile at /profile
 - Users must have both shipping address and payment methods saved in their profile for autonomous checkout
-- Multiple payment methods are supported with default selection
-
-**Example Flow:**
-User: "Proceed with my order"
-Assistant: [Use preview_order] "Here's your order summary: [details]. I'll ship to [address] and charge your saved payment method. Would you like me to proceed with this order?"
-User: "Yes, place the order"
-Assistant: [Use complete_checkout] "🎉 Order placed successfully! Your order #ORD-123 is confirmed."
-
-If profile is incomplete: "Please complete your shipping address and add a payment method in your profile settings first, then I can process your order automatically."
-
-**Cart Management:**
-- Use add_to_cart for adding single or multiple products - pass an array of items with productId and optional quantity
-- Use remove_from_cart to remove items from cart (supports removing specific quantities or entire items)
-- Use view_cart to show current cart contents
-- When users mention multiple products they want, use the bulk add function
-- When users want to remove items, use remove_from_cart with appropriate quantities
-
-**Important Guidelines:**
-- Be proactive in suggesting purchases when users show interest
-- ALWAYS use preview_order first when user wants to checkout - never go directly to complete_checkout
-- Present clear order summary with items, prices, shipping, and total
-- Ask for explicit confirmation: "Would you like me to proceed with this order?"
-- Only use complete_checkout AFTER user explicitly confirms (says "yes", "proceed", "place order", etc.)
-- Handle payment processing automatically and securely using saved payment methods
-- If payment fails, guide users to add/update payment methods
-- Provide clear order confirmations and tracking information
-- Be helpful throughout the entire shopping and purchase journey`;
+`;
 
 // Types for chat functionality
 interface ChatMessage {
@@ -192,7 +175,7 @@ const tools = [
     type: "function",
     function: {
       name: "preview_order",
-      description: "Get order preview with cart contents, shipping address, payment method, and total before checkout. Use this to show order summary and ask for confirmation.",
+      description: "Get order preview with cart contents, shipping address, payment method, and total before complete checkout. Use this to show order summary and ask for confirmation to proceed with payment.",
       parameters: {
         type: "object",
         properties: {},

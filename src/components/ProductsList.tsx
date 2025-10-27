@@ -512,9 +512,9 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredAndSortedProducts.map((product) => (
-              <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-200">
                 <div className="relative">
                   <div className="absolute top-2 left-2 z-10">
                     <label className="flex items-center cursor-pointer">
@@ -546,7 +546,7 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
                 
                 <div className="p-4">
                   <Link href={`/products/${product.id}`}>
-                    <h3 className="font-semibold text-gray-900 mb-2 overflow-hidden text-ellipsis hover:text-blue-600 transition-colors">
+                    <h3 className="h-[50px] font-semibold text-gray-900 mb-2 overflow-hidden text-ellipsis hover:text-blue-600 transition-colors">
                       {product.productName}
                     </h3>
                   </Link>
