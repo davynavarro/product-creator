@@ -223,7 +223,8 @@ export async function getProductFromSupabase(productId: string): Promise<Product
   try {
     const fileName = `${productId}.json`;
     
-    const { data, error } = await supabase.storage
+    // Use supabaseAdmin for consistent permissions
+    const { data, error } = await supabaseAdmin.storage
       .from(BUCKETS.PRODUCTS)
       .download(fileName);
     
