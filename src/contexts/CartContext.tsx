@@ -184,7 +184,7 @@ const CartContext = createContext<{
   addItem: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => void;
   removeItem: (id: string, variant?: CartItem['variant']) => void;
   updateQuantity: (id: string, quantity: number, variant?: CartItem['variant']) => void;
-  clearCart: () => void;
+  clearCart: () => Promise<boolean>;
   getItemQuantity: (id: string, variant?: CartItem['variant']) => number;
   isInCart: (id: string, variant?: CartItem['variant']) => boolean;
 } | null>(null);
@@ -198,34 +198,34 @@ export function CartProvider({ children }: CartProviderProps) {
   const [state, dispatch] = useReducer(cartReducer, initialCartState);
   const hasLoadedRef = useRef(false);
 
-  // Load cart from localStorage on mount
+  // Load server cart on mount (no sync, no save)
   useEffect(() => {
-    try {
-      const savedCart = localStorage.getItem('shopping-cart');
-      if (savedCart) {
-        const cartData = JSON.parse(savedCart) as CartItem[];
-        dispatch({ type: 'LOAD_CART', payload: cartData });
-      } else {
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-      hasLoadedRef.current = true;
-    } catch (error) {
-      console.error('Error loading cart from localStorage:', error);
-      dispatch({ type: 'SET_LOADING', payload: false });
-      hasLoadedRef.current = true;
-    }
-  }, []);
-
-  // Save cart to localStorage whenever cart items change (but not during initial load)
-  useEffect(() => {
-    if (!state.isLoading && hasLoadedRef.current) {
+    const loadServerCart = async () => {
       try {
-        localStorage.setItem('shopping-cart', JSON.stringify(state.items));
+        // Just load the cart from server, don't sync or save anything
+        const response = await fetch('/api/cart/sync', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.items && Array.isArray(result.items)) {
+            dispatch({ type: 'LOAD_CART', payload: result.items });
+          }
+        }
+        
+        dispatch({ type: 'SET_LOADING', payload: false });
+        hasLoadedRef.current = true;
       } catch (error) {
-        console.error('Error saving cart to localStorage:', error);
+        console.error('Error loading cart from server:', error);
+        dispatch({ type: 'SET_LOADING', payload: false });
+        hasLoadedRef.current = true;
       }
-    }
-  }, [state.items, state.isLoading]);
+    };
+
+    loadServerCart();
+  }, []); // Empty dependency array - only run once on mount
 
   // Cart actions (memoized to prevent unnecessary re-renders)
   const addItem = useCallback((item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
@@ -240,8 +240,28 @@ export function CartProvider({ children }: CartProviderProps) {
     dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity, variant } });
   }, []);
 
-  const clearCart = useCallback(() => {
-    dispatch({ type: 'CLEAR_CART' });
+  const clearCart = useCallback(async (): Promise<boolean> => {
+    try {
+      // Clear local cart first
+      dispatch({ type: 'CLEAR_CART' });
+      
+      // Also clear server-side cart using the cart API
+      // The server will get the session ID from NextAuth
+      const response = await fetch('/api/cart', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        return true;
+      } else {
+        console.error('Failed to clear server cart:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('Failed to clear cart:', error);
+      return false;
+    }
   }, []);
 
   const getItemQuantity = (id: string, variant?: CartItem['variant']): number => {

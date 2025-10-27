@@ -1,64 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, list, del } from '@vercel/blob';
-import { CartItem } from '@/contexts/CartContext';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { CartItem, getCartFromSupabase, saveCartToSupabase, deleteCartFromSupabase } from '@/lib/supabase-storage';
 
 export const runtime = 'nodejs';
-
-// Cart session storage in blob (for future server-side sync)
-function getCartSessionKey(sessionId: string): string {
-  return `carts/${sessionId}.json`;
-}
-
-async function getCartFromBlob(sessionId: string): Promise<CartItem[]> {
-  try {
-    const key = getCartSessionKey(sessionId);
-    const blobs = await list({ prefix: key });
-    
-    if (blobs.blobs.length === 0) {
-      return [];
-    }
-    
-    const response = await fetch(blobs.blobs[0].url);
-    if (!response.ok) {
-      return [];
-    }
-    
-    const cartData = await response.json();
-    return Array.isArray(cartData) ? cartData : [];
-  } catch (error) {
-    console.error('Error fetching cart from blob:', error);
-    return [];
-  }
-}
-
-async function saveCartToBlob(sessionId: string, cartItems: CartItem[]): Promise<void> {
-  try {
-    const key = getCartSessionKey(sessionId);
-    const blob = await put(key, JSON.stringify(cartItems), {
-      access: 'public',
-      contentType: 'application/json',
-    });
-    
-    console.log('Cart saved to blob:', blob.url);
-  } catch (error) {
-    console.error('Error saving cart to blob:', error);
-    throw error;
-  }
-}
-
-async function deleteCartFromBlob(sessionId: string): Promise<void> {
-  try {
-    const key = getCartSessionKey(sessionId);
-    const blobs = await list({ prefix: key });
-    
-    for (const blob of blobs.blobs) {
-      await del(blob.url);
-    }
-  } catch (error) {
-    console.error('Error deleting cart from blob:', error);
-    throw error;
-  }
-}
 
 // GET /api/cart - Get cart items for a session
 export async function GET(request: NextRequest) {
@@ -73,14 +18,22 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const cartItems = await getCartFromBlob(sessionId);
+    const cartItems = await getCartFromSupabase(sessionId);
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       items: cartItems,
       totalItems: cartItems.reduce((sum, item) => sum + item.quantity, 0),
       totalAmount: cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
     });
+
+    // Disable all caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+
+    return response;
     
   } catch (error) {
     console.error('Error in GET /api/cart:', error);
@@ -96,7 +49,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { sessionId, items } = body;
-    
+
     if (!sessionId) {
       return NextResponse.json(
         { error: 'Session ID is required' },
@@ -120,14 +73,23 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
     
-    await saveCartToBlob(sessionId, items);
+    await saveCartToSupabase(sessionId, items);
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Cart saved successfully',
       totalItems: items.reduce((sum: number, item: CartItem) => sum + item.quantity, 0),
     });
+
+    // Disable all caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+
+    return response;
     
   } catch (error) {
     console.error('Error in POST /api/cart:', error);
@@ -139,24 +101,30 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE /api/cart - Clear cart for a session
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get('sessionId');
+    // Get session from NextAuth (like sync endpoint does)
+    const session = await getServerSession(authOptions);
     
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: 'Session ID is required' },
-        { status: 400 }
-      );
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
+
+    const sessionId = session.user.email;
+    await deleteCartFromSupabase(sessionId);
     
-    await deleteCartFromBlob(sessionId);
-    
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Cart cleared successfully',
     });
+
+    // Disable all caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+
+    return response;
     
   } catch (error) {
     console.error('Error in DELETE /api/cart:', error);

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { saveProductToBlob } from '@/lib/blob-storage';
+import { saveProductToSupabase } from '@/lib/supabase-storage';
 
 interface ProductData {
   productName: string;
@@ -47,11 +46,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate unique product ID
-    const productId = uuidv4();
+    const tempProductId = uuidv4();
     
     // Create product record with metadata
     const productRecord: ProductRecord = {
-      id: productId,
+      id: tempProductId, // This will be replaced by the actual ID from Supabase
       ...productData,
       imageUrl,
       createdAt: new Date().toISOString(),
@@ -61,25 +60,51 @@ export async function POST(request: NextRequest) {
         .replace(/(^-|-$)/g, ''),
     };
 
-    // Save to Vercel Blob
-    await saveProductToBlob(productRecord);
+    // Save to Supabase
+    const supabaseProductData = {
+      productName: productRecord.productName,
+      tagline: productRecord.tagline,
+      description: productRecord.description,
+      keyFeatures: productRecord.keyFeatures,
+      specifications: productRecord.specifications,
+      pricing: productRecord.pricing,
+      benefits: productRecord.benefits,
+      targetAudience: productRecord.targetAudience,
+      category: productRecord.category,
+      categoryId: productRecord.categoryId || 'cat_electronics',
+      categoryConfidence: productRecord.categoryConfidence || 0.8,
+      categoryReasoning: productRecord.categoryReasoning || 'Default category assignment',
+      tags: productRecord.tags,
+      categoryPath: productRecord.categoryPath || productRecord.category,
+      categoryMetadata: {
+        level: 0,
+        parentCategory: undefined,
+        suggestedSubcategories: []
+      },
+      imageUrl: productRecord.imageUrl,
+      createdAt: productRecord.createdAt,
+      slug: productRecord.slug
+    };
+    
+    // saveProductToSupabase returns the actual product ID that was used
+    const actualProductId = await saveProductToSupabase(supabaseProductData);
 
-    // Invalidate related caches to ensure fresh data
-    try {
-      revalidatePath('/products');
-      revalidatePath('/api/products');
-      revalidatePath('/');
-      console.log('Cache invalidated after product save');
-    } catch (revalidateError) {
-      console.warn('Cache revalidation failed (non-critical):', revalidateError);
-    }
+    // No cache invalidation needed since we disabled all caching
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
-      productId,
-      productUrl: `/products/${productId}`,
+      productId: actualProductId, // Use the actual ID from Supabase
+      productUrl: `/products/${actualProductId}`,
       productSlug: productRecord.slug
     });
+
+    // Disable all caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+
+    return response;
 
   } catch (error) {
     console.error('Save product error:', error);

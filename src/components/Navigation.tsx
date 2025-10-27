@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { User, LogOut, Settings, Package } from 'lucide-react';
 import Image from 'next/image';
 import CartIcon from '@/components/cart/CartIcon';
+import SearchComponent from '@/components/SearchComponent';
 
 export default function Navigation() {
   const { data: session, status } = useSession();
@@ -52,13 +53,26 @@ export default function Navigation() {
               Products
             </Link>
             {session && (
-              <Link
-                href="/admin"
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Admin
-              </Link>
+              <>
+                <Link
+                  href="/chat"
+                  className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
+                >
+                  🤖 AI Assistant
+                </Link>
+                <Link
+                  href="/admin"
+                  className="text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Admin
+                </Link>
+              </>
             )}
+          </div>
+
+          {/* Search */}
+          <div className="hidden lg:block flex-1 max-w-md mx-8">
+            <SearchComponent compact showFilters={false} />
           </div>
 
           {/* Right side - Cart and Auth */}

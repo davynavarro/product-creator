@@ -1,17 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-
-interface OrderSummary {
-  orderId: string;
-  customerEmail: string;
-  customerName: string;
-  total: number;
-  currency: string;
-  status: string;
-  createdAt: string;
-  blobUrl?: string;
-}
+import { getOrdersFromSupabase, OrderIndexItem } from '@/lib/supabase-storage';
 
 export async function GET() {
   try {
@@ -24,15 +14,8 @@ export async function GET() {
     const userEmail = session.user.email;
 
     try {
-      // Fetch orders index from blob storage
-      const indexResponse = await fetch(`${process.env.BLOB_DB_URL}orders-index.json`);
-      
-      if (!indexResponse.ok) {
-        console.log('No orders index found, returning empty array');
-        return NextResponse.json([]);
-      }
-
-      const allOrders: OrderSummary[] = await indexResponse.json();
+      // Fetch orders from Supabase
+      const allOrders: OrderIndexItem[] = await getOrdersFromSupabase();
       
       // Filter orders by user email
       const userOrders = allOrders.filter(order => 
@@ -46,7 +29,7 @@ export async function GET() {
 
       return NextResponse.json(userOrders);
     } catch (fetchError) {
-      console.error('Error fetching orders from blob storage:', fetchError);
+      console.error('Error fetching orders from Supabase:', fetchError);
       // Return empty array instead of error to gracefully handle missing data
       return NextResponse.json([]);
     }

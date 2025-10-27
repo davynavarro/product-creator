@@ -1,36 +1,13 @@
 import ProductsList from '@/components/ProductsList';
-import { getProductsFromBlob } from '@/lib/blob-storage';
 
-interface ProductIndexItem {
-  id: string;
-  productName: string;
-  slug: string;
-  category: string;
-  createdAt: string;
-  imageUrl: string;
-  pricing: {
-    currency: string;
-    price: number;
-    originalPrice?: number;
-    discount?: string;
-  };
-}
-
-// Enable smart caching for this page - revalidate when content changes
-export const dynamic = 'auto';
-export const revalidate = 60; // Revalidate every 60 seconds max
+// Disable all caching for this page
+export const dynamic = 'force-dynamic';
+export const revalidate = 0; // No revalidation caching
 
 export default async function ProductsPage() {
-  let products: ProductIndexItem[] = [];
+  // Don't fetch products server-side, let the component handle it entirely on client-side
+  // This eliminates any server-side caching issues
   
-  try {
-    console.log('ProductsPage: Fetching products...');
-    products = await getProductsFromBlob();
-    console.log('ProductsPage: Fetched', products.length, 'products:', products.map(p => p.id));
-  } catch (error) {
-    console.error('Failed to fetch products:', error);
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -40,14 +17,7 @@ export default async function ProductsPage() {
             Browse and manage your AI-generated product pages
           </p>
         </div>
-        {products.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found.</p>
-            <p className="text-gray-400 mt-2">Create your first product to get started!</p>
-          </div>
-        ) : (
-          <ProductsList initialProducts={products} />
-        )}
+        <ProductsList initialProducts={[]} />
       </div>
     </div>
   );

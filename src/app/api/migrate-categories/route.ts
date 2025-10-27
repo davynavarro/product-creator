@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getProductsFromBlob,
-  getProductFromBlob,
-  saveProductToBlob,
-  getCategoriesFromBlob,
+  getProductsFromSupabase,
+  getProductFromSupabase,
+  saveProductToSupabase,
+  getCategoriesFromSupabase,
   getCategoryPath,
   initializeDefaultCategories,
-} from '@/lib/blob-storage';
+} from '@/lib/supabase-storage';
 
 // POST /api/migrate-categories - Migrate existing products to use structured categories
 export async function POST(request: NextRequest) {
@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
     await initializeDefaultCategories();
     
     // Get all categories and products
-    const categories = await getCategoriesFromBlob();
-    const products = await getProductsFromBlob();
+    const categories = await getCategoriesFromSupabase();
+    const products = await getProductsFromSupabase();
     
     const migrationResults = {
       totalProducts: products.length,
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Get full product data
-        const fullProduct = await getProductFromBlob(productIndex.id);
+        const fullProduct = await getProductFromSupabase(productIndex.id);
         if (!fullProduct) {
           migrationResults.errors.push(`Could not load product ${productIndex.id}`);
           continue;
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
 
           // The product index will be updated automatically when saveProductToBlob is called
 
-          await saveProductToBlob(updatedProduct);
+          await saveProductToSupabase(updatedProduct);
           migrationResults.migratedProducts++;
         }
 
@@ -184,8 +184,8 @@ export async function POST(request: NextRequest) {
 // GET /api/migrate-categories - Get migration status and preview
 export async function GET() {
   try {
-    const products = await getProductsFromBlob();
-    const categories = await getCategoriesFromBlob();
+    const products = await getProductsFromSupabase();
+    const categories = await getCategoriesFromSupabase();
     
     const stats = {
       totalProducts: products.length,

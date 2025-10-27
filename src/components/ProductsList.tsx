@@ -53,6 +53,7 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(initialProducts.length === 0); // Loading if starting with empty
 
   // Search and filtering state
   const [searchState, setSearchState] = useState<SearchState>({
@@ -69,6 +70,32 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
   // Debounced search term for performance
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchState.searchTerm);
   
+  const refreshProducts = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      // Fetch fresh data directly (no cache revalidation needed)
+      const response = await fetch('/api/products', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
+      
+      if (response.ok) {
+        const freshProducts = await response.json();
+        setProducts(freshProducts);
+        console.log('Products refreshed:', freshProducts.length);
+      } else {
+        console.error('Failed to refresh products:', response.status);
+      }
+    } catch (error) {
+      console.error('Failed to refresh products:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchState.searchTerm);
@@ -76,6 +103,18 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
 
     return () => clearTimeout(timer);
   }, [searchState.searchTerm]);
+
+  // Auto-refresh products when component mounts or gets focus
+  useEffect(() => {
+    refreshProducts();
+    
+    const handleFocus = () => {
+      refreshProducts();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refreshProducts]);
 
   const formatPrice = (price: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -192,38 +231,6 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
     }
   };
 
-  const refreshProducts = async () => {
-    try {
-      // First trigger server-side cache revalidation
-      await fetch('/api/revalidate-cache', { 
-        method: 'GET',
-        cache: 'no-store'
-      }).catch(() => {
-        // Non-critical if this fails, continue with client refresh
-        console.log('Server cache revalidation skipped');
-      });
-
-      // Then fetch fresh data
-      const response = await fetch('/api/products', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        }
-      });
-      
-      if (response.ok) {
-        const freshProducts = await response.json();
-        setProducts(freshProducts);
-        console.log('Products refreshed:', freshProducts.length);
-      } else {
-        console.error('Failed to refresh products:', response.status);
-      }
-    } catch (error) {
-      console.error('Failed to refresh products:', error);
-    }
-  };
-
   const handleBulkDelete = async () => {
     if (selectedProducts.size === 0) return;
 
@@ -264,13 +271,20 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Generated Products</h1>
-            <p className="text-base text-gray-700 mt-2">
-              {filteredAndSortedProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''} shown
-            </p>
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading products...</p>
           </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Generated Products</h1>
+                <p className="text-base text-gray-700 mt-2">
+                  {filteredAndSortedProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''} shown
+                </p>
+              </div>
           
           <div className="flex items-center space-x-4">
             {selectedProducts.size > 0 && (
@@ -602,6 +616,8 @@ export default function ProductsList({ initialProducts }: ProductsListProps) {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </div>

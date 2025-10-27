@@ -10,7 +10,7 @@ export default function CartPage() {
 
   if (state.isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-gray-50 py-8 ">
         <div className="max-w-4xl mx-auto px-4">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-300 rounded w-32 mb-8"></div>
@@ -35,17 +35,26 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4 text-black">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Shopping Cart</h1>
-          {state.items.length > 0 && (
-            <button
-              onClick={clearCart}
-              className="text-red-600 hover:text-red-700 text-sm font-medium"
-            >
-              Clear Cart
-            </button>
-          )}
+          <div className="flex gap-4">
+            {state.items.length > 0 && (
+              <button
+                onClick={async () => {
+                  const success = await clearCart();
+                  if (success) {
+                    alert('Cart cleared successfully!');
+                  } else {
+                    alert('Failed to clear cart. Please try again.');
+                  }
+                }}
+                className="text-red-600 hover:text-red-700 text-sm font-medium"
+              >
+                Clear Cart
+              </button>
+            )}
+          </div>
         </div>
 
         {state.items.length === 0 ? (

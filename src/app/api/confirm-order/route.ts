@@ -1,47 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { put } from '@vercel/blob';
+import { saveOrderToSupabase, OrderData, updateOrdersIndex } from '@/lib/supabase-storage';
 import { CartItem } from '@/contexts/CartContext';
-
-interface OrderData {
-  orderId: string;
-  paymentIntentId: string;
-  customerInfo: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-  };
-  shippingAddress: {
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  items: Array<{
-    id: string;
-    productName: string;
-    quantity: number;
-    price: number;
-    currency: string;
-  }>;
-  totals: {
-    subtotal: number;
-    shipping: number;
-    tax: number;
-    total: number;
-    currency: string;
-  };
-  status: 'confirmed' | 'processing' | 'shipped' | 'delivered';
-  createdAt: string;
-}
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the user session to ensure authenticated orders
-    const session = await getServerSession(authOptions);
     
     const {
       paymentIntentId,
@@ -95,49 +57,17 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    // Save order to blob storage
-    const orderBlob = await put(
-      `orders/${orderId}.json`,
-      JSON.stringify(orderData, null, 2),
-      { 
-        access: 'public',
-        contentType: 'application/json' 
-      }
-    );
-
-    // Update orders index
+    // Save order data to Supabase
     try {
-      const indexResponse = await fetch(`${process.env.BLOB_DB_URL}orders-index.json`);
-      let ordersIndex = [];
-      
-      if (indexResponse.ok) {
-        ordersIndex = await indexResponse.json();
-      }
-
-      // Add new order to index
-      ordersIndex.push({
-        orderId,
-        customerEmail: orderData.customerInfo.email,
-        customerName: `${orderData.customerInfo.firstName} ${orderData.customerInfo.lastName}`,
-        total: orderData.totals.total,
-        currency: orderData.totals.currency,
-        status: orderData.status,
-        createdAt: orderData.createdAt,
-        blobUrl: orderBlob.url,
-        userId: session?.user?.email || orderData.customerInfo.email, // Add user ID for filtering
-      });
-
-      // Save updated index
-      await put(
-        'orders-index.json',
-        JSON.stringify(ordersIndex, null, 2),
-        { 
-          access: 'public',
-          contentType: 'application/json',
-          addRandomSuffix: false,
-          allowOverwrite: true
-        }
-      );
+      await saveOrderToSupabase(orderData);
+      console.log('Order saved to Supabase successfully:', orderData.orderId);
+    } catch (saveError) {
+      console.error('Failed to save order to Supabase:', saveError);
+      throw new Error('Order save failed');
+    }    // Update orders index in Supabase
+    try {
+      await updateOrdersIndex(orderData);
+      console.log('Orders index updated successfully');
     } catch (indexError) {
       console.error('Failed to update orders index:', indexError);
       // Continue - order is still saved

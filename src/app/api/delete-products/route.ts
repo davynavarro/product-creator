@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteProductFromBlob } from '@/lib/blob-storage';
+import { deleteProductFromSupabase } from '@/lib/supabase-storage';
 
 // Delete individual product
 export async function DELETE(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
     }
 
-    await deleteProductFromBlob(productId);
+    await deleteProductFromSupabase(productId);
 
     return NextResponse.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const results = [];
     for (const productId of productIds) {
       try {
-        await deleteProductFromBlob(productId);
+        await deleteProductFromSupabase(productId);
         results.push({ id: productId, success: true });
       } catch (error) {
         console.error(`Failed to delete product ${productId}:`, error);

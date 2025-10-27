@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import {
-  getCategoriesFromBlob,
+  getCategoriesFromSupabase,
   buildCategoryTree,
   initializeDefaultCategories,
   getCategoryPath,
   type Category,
-} from '@/lib/blob-storage';
+} from '@/lib/supabase-storage';
 
 const openai = new OpenAI({
   apiKey: process.env.AZURE_OPENAI_API_KEY,
@@ -17,50 +17,17 @@ const openai = new OpenAI({
   },
 });
 
-// Category cache to minimize API calls during product generation
-let categoryCache: {
-  data: Category[];
-  timestamp: number;
-  ttl: number;
-} | null = null;
-
-const CATEGORY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Fetch categories with caching
-async function getCachedCategories(): Promise<Category[]> {
-  const now = Date.now();
-  
-  // Return cached data if still valid
-  if (categoryCache && (now - categoryCache.timestamp) < categoryCache.ttl) {
-    return categoryCache.data;
-  }
-
+// Fetch categories without caching
+async function getCategories(): Promise<Category[]> {
   try {
     // Initialize default categories if needed
     await initializeDefaultCategories();
     
-    // Fetch fresh categories
-    const categories = await getCategoriesFromBlob();
-    
-    // Update cache
-    categoryCache = {
-      data: categories,
-      timestamp: now,
-      ttl: CATEGORY_CACHE_TTL,
-    };
-    
+    // Fetch fresh categories every time
+    const categories = await getCategoriesFromSupabase();
     return categories;
   } catch (error) {
     console.error('Failed to fetch categories:', error);
-    
-    // Return cached data if available, even if expired
-    if (categoryCache) {
-      console.log('Using expired category cache due to fetch failure');
-      return categoryCache.data;
-    }
-    
-    // Last resort: return empty array
-    console.log('No category cache available, returning empty array');
     return [];
   }
 }
@@ -159,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch categories for AI context
-    const categories = await getCachedCategories();
+    const categories = await getCategories();
     const categoryContext = formatCategoriesForAI(categories);
 
     const systemPrompt = `You are a professional product marketing expert. Based on the product brief provided, generate comprehensive product details for an e-commerce product page.
@@ -286,15 +253,29 @@ Generate professional product details for this item.`;
       enhancedProductData.category = categoryValidation.category.name;
     }
 
-    return NextResponse.json({
+    const apiResponse = NextResponse.json({
       success: true,
       productData: enhancedProductData
     });
 
+    // Disable all caching
+    apiResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    apiResponse.headers.set('Pragma', 'no-cache');
+    apiResponse.headers.set('Expires', '0');
+    apiResponse.headers.set('Surrogate-Control', 'no-store');
+
+    return apiResponse;
+
   } catch (error) {
     console.error('AI generation error:', error);
+    console.error('Environment check:', {
+      hasApiKey: !!process.env.AZURE_OPENAI_API_KEY,
+      hasEndpoint: !!process.env.AZURE_OPENAI_ENDPOINT,
+      hasDeployment: !!process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
+      hasVersion: !!process.env.AZURE_OPENAI_API_VERSION
+    });
     return NextResponse.json(
-      { error: 'Failed to generate product details' },
+      { error: 'Failed to generate product details', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

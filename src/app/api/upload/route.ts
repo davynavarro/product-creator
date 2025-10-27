@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadImageToBlob } from '@/lib/blob-storage';
+import { saveImageToSupabase } from '@/lib/supabase-storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    // Upload to Vercel Blob
-    const imageUrl = await uploadImageToBlob(file);
+    // Upload to Supabase
+    const imageUrl = await saveImageToSupabase(file, file.name);
 
     return NextResponse.json({
       success: true,

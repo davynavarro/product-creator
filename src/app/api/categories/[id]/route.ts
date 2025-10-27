@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getCategoriesFromBlob,
-  updateCategory,
-  deleteCategory,
+  getCategoriesFromSupabase,
+  updateCategoryInSupabase,
+  deleteCategoryFromSupabase,
   getCategoryPath,
-} from '@/lib/blob-storage';
+} from '@/lib/supabase-storage';
 
 type Params = {
   params: Promise<{
@@ -16,7 +16,7 @@ type Params = {
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const categories = await getCategoriesFromBlob();
+    const categories = await getCategoriesFromSupabase();
     const category = categories.find(cat => cat.id === id);
 
     if (!category) {
@@ -79,7 +79,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         .trim();
     }
 
-    const updatedCategory = await updateCategory(id, updates);
+    const updatedCategory = await updateCategoryInSupabase(id, updates);
     
     return NextResponse.json(updatedCategory);
   } catch (error) {
@@ -123,7 +123,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       }
     }
 
-    await deleteCategory(id, options);
+    await deleteCategoryFromSupabase(id, options);
     
     return NextResponse.json({ message: 'Category deleted successfully' });
   } catch (error) {

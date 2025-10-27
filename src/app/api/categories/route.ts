@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getCategoriesFromBlob,
-  createCategory,
+  getCategoriesFromSupabase,
+  saveCategoriesToSupabase,
   buildCategoryTree,
   initializeDefaultCategories,
-  generateSlug,
-} from '@/lib/blob-storage';
+  type Category,
+} from '@/lib/supabase-storage';
+
+// Helper function to generate slug
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 // GET /api/categories - Get all categories in hierarchical structure
 export async function GET(request: NextRequest) {
@@ -19,15 +27,24 @@ export async function GET(request: NextRequest) {
       await initializeDefaultCategories();
     }
 
-    const categories = await getCategoriesFromBlob();
+    const categories = await getCategoriesFromSupabase();
 
+    let response;
     if (format === 'tree') {
       const categoryTree = buildCategoryTree(categories);
-      return NextResponse.json(categoryTree);
+      response = NextResponse.json(categoryTree);
+    } else {
+      // Return flat list by default
+      response = NextResponse.json(categories);
     }
 
-    // Return flat list by default
-    return NextResponse.json(categories);
+    // Disable all caching
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('Surrogate-Control', 'no-store');
+
+    return response;
   } catch (error) {
     console.error('Error fetching categories:', error);
     return NextResponse.json(
@@ -55,8 +72,8 @@ export async function POST(request: NextRequest) {
     const slug = generateSlug(name);
 
     // Validate slug uniqueness
-    const categories = await getCategoriesFromBlob();
-    const existingSlug = categories.find(cat => cat.slug === slug);
+    const categories = await getCategoriesFromSupabase();
+    const existingSlug = categories.find((cat: Category) => cat.slug === slug);
     if (existingSlug) {
       return NextResponse.json(
         { error: 'A category with this name already exists' },
@@ -65,15 +82,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the category
-    const categoryData = {
+    const newCategory: Category = {
+      id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: name.trim(),
       description: description?.trim() || undefined,
       parentId: parentId || null,
       slug,
       isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    const newCategory = await createCategory(categoryData);
+    // Add to categories array and save
+    const updatedCategories = [...categories, newCategory];
+    await saveCategoriesToSupabase(updatedCategories);
     
     return NextResponse.json(newCategory, { status: 201 });
   } catch (error) {

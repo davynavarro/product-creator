@@ -11,10 +11,10 @@
   "dependencies": {
     "@stripe/react-stripe-js": "^5.2.0",
     "@stripe/stripe-js": "^8.1.0",
+    "@supabase/supabase-js": "^2.76.1",
     "@tailwindcss/line-clamp": "^0.4.4",
     "@types/multer": "^2.0.0",
     "@types/uuid": "^10.0.0",
-    "@vercel/blob": "^2.0.0",
     "lucide-react": "^0.545.0",
     "multer": "^2.0.2",
     "next": "15.5.4",
@@ -23,6 +23,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.65.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "stripe": "^19.1.0",
     "uuid": "^13.0.0"
   },
