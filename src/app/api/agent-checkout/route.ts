@@ -12,17 +12,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const {
       shared_payment_token,
       cartItems,
       shippingInfo,
-      orderNote
+      orderNote,
+      userEmail: serverUserEmail // For server-side calls from chat agent
     } = await request.json();
 
     if (!shared_payment_token || !cartItems || !shippingInfo) {
@@ -31,7 +26,25 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log('Agent-initiated checkout for user:', session.user.email);
+    // If userEmail is provided in request body, use it (for server-side calls)
+    // Otherwise, use session authentication
+    let userEmail: string;
+    
+    if (serverUserEmail) {
+      // Server-side call with explicit user email
+      userEmail = serverUserEmail;
+    } else {
+      // Regular client call - require session
+      const session = await getServerSession(authOptions);
+      
+      if (!session?.user?.email) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      
+      userEmail = session.user.email;
+    }
+
+    console.log('Agent-initiated checkout for user:', userEmail);
 
     // Step 1: Validate the Shared Payment Token
     let paymentIntent;
@@ -42,19 +55,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payment token' }, { status: 400 });
     }
 
-    // Step 2: Security checks
-    if (paymentIntent.metadata.user_email !== session.user.email) {
+    // Step 2: Security checks - validate token belongs to user
+    if (paymentIntent.metadata.user_email !== userEmail) {
+        console.log('Payment token user email:', paymentIntent.metadata.user_email);
       return NextResponse.json({ error: 'Payment token ownership mismatch' }, { status: 403 });
     }
 
+    // Step 3: Security checks - token expiration
     const expiresAt = new Date(paymentIntent.metadata.expires_at);
     if (expiresAt < new Date()) {
+        console.log('Payment token expired at:', expiresAt.toISOString());
       return NextResponse.json({ error: 'Payment token expired' }, { status: 410 });
     }
 
     // Step 3: Validate cart contents match the token
     const currentCartHash = generateCartHash(cartItems);
     if (currentCartHash !== paymentIntent.metadata.cart_hash) {
+        console.log('Current cart hash:', currentCartHash);
+        console.log('Payment token cart hash:', paymentIntent.metadata.cart_hash);
       return NextResponse.json({ 
         error: 'Cart contents have changed since token generation' 
       }, { status: 400 });
@@ -63,23 +81,36 @@ export async function POST(request: NextRequest) {
     // Step 4: Calculate totals using utility function
     const orderTotals = calculateOrderTotals(cartItems);
 
-    // Note: This uses free shipping for SPT demo, but utility function handles regular shipping logic
-    const total = orderTotals.subtotal + orderTotals.tax; // Free shipping for SPT demo
+    // Use full total including tax and shipping (should match SPT creation)
+    const total = orderTotals.total; // This includes subtotal + tax + shipping
 
     // Verify amount matches payment intent
     if (Math.abs(total - (paymentIntent.amount / 100)) > 0.01) {
+        console.log('Calculated total:', total);
+        console.log('Payment intent amount:', paymentIntent.amount / 100);
       return NextResponse.json({ 
         error: 'Order total mismatch with payment token' 
       }, { status: 400 });
     }
 
-    // Step 5: Capture the payment
+    // Step 5: Confirm and capture the payment
+    let finalPaymentIntent = paymentIntent;
+    
+    // If payment intent needs confirmation, confirm it first
+    if (paymentIntent.status === 'requires_confirmation') {
+      console.log('Payment intent requires confirmation, confirming...');
+      finalPaymentIntent = await stripe.paymentIntents.confirm(shared_payment_token);
+      console.log('Payment intent confirmed, status:', finalPaymentIntent.status);
+    }
+    
+    // Now capture the payment
     const captureResult = await stripe.paymentIntents.capture(shared_payment_token);
     
     if (captureResult.status !== 'succeeded') {
       return NextResponse.json({ 
         error: 'Payment capture failed', 
-        details: captureResult.last_payment_error?.message 
+        details: captureResult.last_payment_error?.message,
+        status: captureResult.status
       }, { status: 402 });
     }
 
@@ -92,7 +123,7 @@ export async function POST(request: NextRequest) {
       customerInfo: {
         firstName: shippingInfo.firstName,
         lastName: shippingInfo.lastName,
-        email: session.user.email,
+        email: userEmail,
         phone: shippingInfo.phone || '',
       },
       shippingAddress: {

@@ -642,40 +642,40 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
         }
 
         // Step 3: Try direct checkout with saved payment methods first
-        console.log('Attempting direct checkout with saved payment methods...');
+        // console.log('Attempting direct checkout with saved payment methods...');
         
-        const directCheckoutResponse = await fetch(`${baseUrl}/api/direct-checkout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cartItems,
-            shippingInfo,
-            useDefaultPaymentMethod: true,
-            orderNote: orderNote || 'Order placed via AI assistant',
-            userEmail: userEmail // Pass user email for server-side authentication
-          })
-        });
+        // const directCheckoutResponse = await fetch(`${baseUrl}/api/direct-checkout`, {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+        //     cartItems,
+        //     shippingInfo,
+        //     useDefaultPaymentMethod: true,
+        //     orderNote: orderNote || 'Order placed via AI assistant',
+        //     userEmail: userEmail // Pass user email for server-side authentication
+        //   })
+        // });
 
-        if (directCheckoutResponse.ok) {
-          // Direct checkout succeeded
-          const checkoutData = await directCheckoutResponse.json();
+        // if (directCheckoutResponse.ok) {
+        //   // Direct checkout succeeded
+        //   const checkoutData = await directCheckoutResponse.json();
           
-          // Clear the cart after successful order
-          await fetch(`${baseUrl}/api/cart`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId })
-          });
+        //   // Clear the cart after successful order
+        //   await fetch(`${baseUrl}/api/cart`, {
+        //     method: 'DELETE',
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify({ sessionId })
+        //   });
 
-          return JSON.stringify({
-            success: true,
-            message: `🎉 Order placed successfully using your saved payment method! Your order ${checkoutData.orderId} is confirmed.`,
-            orderId: checkoutData.orderId,
-            total: checkoutData.orderData.total,
-            currency: checkoutData.orderData.currency,
-            itemCount: checkoutData.orderData.items
-          });
-        }
+        //   return JSON.stringify({
+        //     success: true,
+        //     message: `🎉 Order placed successfully using your saved payment method! Your order ${checkoutData.orderId} is confirmed.`,
+        //     orderId: checkoutData.orderId,
+        //     total: checkoutData.orderData.total,
+        //     currency: checkoutData.orderData.currency,
+        //     itemCount: checkoutData.orderData.items
+        //   });
+        // }
 
         console.log('Direct checkout failed, falling back to SPT method...');
         
@@ -710,7 +710,8 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
             shared_payment_token: sptData.shared_payment_token,
             cartItems,
             shippingInfo,
-            orderNote: 'Order placed via AI assistant (SPT fallback)'
+            orderNote: 'Order placed via AI assistant (SPT fallback)',
+            userEmail: userEmail // Pass user email for server-side authentication
           })
         });
 

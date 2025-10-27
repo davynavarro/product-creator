@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { CartItem } from '@/contexts/CartContext';
+import { calculateOrderTotals } from '@/lib/order-calculations';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -38,18 +39,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment method required' }, { status: 400 });
     }
 
-    // Calculate total from cart items
-    const total = cartItems.reduce((sum: number, item: CartItem) => {
-      return sum + (item.price * item.quantity);
-    }, 0);
+    // Calculate total from cart items including tax and shipping
+    const orderTotals = calculateOrderTotals(cartItems);
+    const totalWithTaxAndShipping = orderTotals.total; // This includes subtotal + tax + shipping
+
+    // Find or create Stripe customer
+    let customer;
+    const customers = await stripe.customers.list({
+      email: userEmail,
+      limit: 1,
+    });
+
+    if (customers.data.length > 0) {
+      customer = customers.data[0];
+    } else {
+      // Create new customer if none exists
+      customer = await stripe.customers.create({
+        email: userEmail,
+        metadata: {
+          source: 'genai-product-builder-spt'
+        }
+      });
+    }
 
     // Generate a scoped payment token for this specific cart and user
     const sharedPaymentToken = await stripe.paymentIntents.create({
-      amount: Math.round(total * 100), // Convert to cents
+      amount: Math.round(totalWithTaxAndShipping * 100), // Convert to cents
       currency: 'usd',
       payment_method: paymentMethodId,
-      customer: userEmail, // Use email as customer ID for now
+      customer: customer.id, // Use proper Stripe customer ID
       capture_method: 'manual', // Don't capture until agent confirms
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never' // Disable redirect-based payment methods for AI agent
+      },
       metadata: {
         user_email: userEmail,
         cart_hash: generateCartHash(cartItems),
@@ -59,12 +82,12 @@ export async function POST(request: NextRequest) {
       description: `Shared Payment Token for ${cartItems.length} items`
     });
 
-    console.log('Generated SPT for user:', userEmail, 'Total:', total);
+    console.log('Generated SPT for user:', userEmail, 'Total:', totalWithTaxAndShipping);
 
     return NextResponse.json({
       success: true,
       shared_payment_token: sharedPaymentToken.id,
-      amount: total,
+      amount: totalWithTaxAndShipping,
       currency: 'usd',
       expires_at: sharedPaymentToken.metadata.expires_at,
       cart_items: cartItems.length
