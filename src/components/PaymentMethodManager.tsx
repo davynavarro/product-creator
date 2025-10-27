@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { SavedPaymentMethod, PaymentMethodsResponse, SetupIntentResponse } from '@/types/payment';
-import { AddPaymentMethodForm } from './AddPaymentMethodForm';
+import { AddPaymentMethodForm } from '@/components/AddPaymentMethodForm';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY!);
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY || '');
 
 export function PaymentMethodManager() {
   const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>([]);
@@ -248,3 +248,5 @@ export function PaymentMethodManager() {
     </div>
   );
 }
+
+export default PaymentMethodManager;
