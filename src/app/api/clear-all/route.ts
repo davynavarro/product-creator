@@ -21,7 +21,7 @@ export async function POST() {
     console.log('Starting to clear all Supabase storage...');
     
     const results: ClearResult[] = [];
-    const bucketsToClean: string[] = Object.values(BUCKETS); // ['products', 'images', 'cart', 'categories', 'orders']
+    const bucketsToClean: string[] = Object.values(BUCKETS);
     
     let totalDeleted = 0;
 
@@ -32,10 +32,7 @@ export async function POST() {
         // List all files in the bucket
         const { data: files, error: listError } = await supabaseAdmin.storage
           .from(bucket)
-          .list('', {
-            limit: 1000,
-            sortBy: { column: 'name', order: 'asc' }
-          });
+          .list();
 
         if (listError) {
           console.error(`Error listing files in ${bucket}:`, listError);
@@ -58,11 +55,10 @@ export async function POST() {
           continue;
         }
 
-        // Get file paths for deletion
-        const filePaths = files.map((file: { name: string }) => file.name);
-        console.log(`Deleting ${filePaths.length} files from ${bucket}:`, filePaths);
-
-        // Delete all files in batch
+        console.log(`Found ${files.length} files in bucket: ${bucket}`);
+        
+        // Delete all files in the bucket
+        const filePaths = files.map(file => file.name);
         const { error: deleteError } = await supabaseAdmin.storage
           .from(bucket)
           .remove(filePaths);
@@ -75,81 +71,45 @@ export async function POST() {
             deletedCount: 0,
             error: deleteError.message
           });
-        } else {
-          console.log(`Successfully deleted ${filePaths.length} files from ${bucket}`);
-          totalDeleted += filePaths.length;
-          results.push({
-            bucket,
-            success: true,
-            deletedCount: filePaths.length
-          });
+          continue;
         }
 
-      } catch (error) {
-        console.error(`Error processing bucket ${bucket}:`, error);
+        console.log(`Successfully deleted ${filePaths.length} files from bucket: ${bucket}`);
+        totalDeleted += filePaths.length;
+        results.push({
+          bucket,
+          success: true,
+          deletedCount: filePaths.length
+        });
+
+      } catch (bucketError) {
+        console.error(`Error processing bucket ${bucket}:`, bucketError);
         results.push({
           bucket,
           success: false,
           deletedCount: 0,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: bucketError instanceof Error ? bucketError.message : 'Unknown error'
         });
       }
     }
 
-    // Reset index files by creating empty ones
-    const indexFiles = [
-      { bucket: BUCKETS.PRODUCTS, filename: 'products-index.json', content: [] },
-      { bucket: BUCKETS.CATEGORIES, filename: 'categories-index.json', content: [] },
-      { bucket: BUCKETS.ORDERS, filename: 'orders-index.json', content: [] }
-    ];
-
-    console.log('Resetting index files...');
-    
-    for (const indexFile of indexFiles) {
-      try {
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from(indexFile.bucket)
-          .upload(indexFile.filename, JSON.stringify(indexFile.content, null, 2), {
-            contentType: 'application/json',
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error(`Error resetting ${indexFile.filename}:`, uploadError);
-        } else {
-          console.log(`Successfully reset ${indexFile.filename}`);
-        }
-      } catch (error) {
-        console.error(`Error processing ${indexFile.filename}:`, error);
-      }
-    }
-
-    const successfulBuckets = results.filter(r => r.success).length;
-    const failedBuckets = results.filter(r => !r.success).length;
-
-    console.log(`Clear operation completed: ${successfulBuckets} successful, ${failedBuckets} failed, ${totalDeleted} total files deleted`);
+    console.log(`Finished clearing storage. Total files deleted: ${totalDeleted}`);
 
     return NextResponse.json({
       success: true,
-      message: `Cleared ${successfulBuckets} buckets successfully`,
+      message: `Successfully cleared ${totalDeleted} files from ${bucketsToClean.length} buckets`,
       totalDeleted,
       results,
-      summary: {
-        bucketsProcessed: bucketsToClean.length,
-        successful: successfulBuckets,
-        failed: failedBuckets,
-        totalFilesDeleted: totalDeleted
-      }
+      buckets: bucketsToClean
     });
 
   } catch (error) {
     console.error('Error clearing storage:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to clear storage',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear storage',
+      totalDeleted: 0,
+      results: []
+    }, { status: 500 });
   }
 }
