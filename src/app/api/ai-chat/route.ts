@@ -10,60 +10,68 @@ import {
   TieredShippingProvider,
   type ProductProvider,
   type CartProvider,
-  type ProfileProvider
+  type ProfileProvider,
+  type CartItem
 } from '../../../../lib/ai-shopping-assistant';
+import { 
+  getProductsFromSupabase, 
+  getCartFromSupabase, 
+  saveCartToSupabase, 
+  deleteCartFromSupabase,
+  getUserProfileFromSupabase 
+} from '@/lib/supabase-storage';
 
 const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
-// Interface for your API's product format
-interface APIProduct {
-  id: string;
-  productName: string;
-  description?: string;
-  tagline?: string;
-  pricing?: {
-    price: number;
-  };
-  category?: string;
-  imageUrl?: string;
-  specifications?: Record<string, string | number | boolean>;
-}
-
-// Server-side providers that use your existing APIs
-class ServerProductProvider implements ProductProvider {
+// Direct service providers that use database calls instead of HTTP (more secure)
+// Note: Using userIdentifier as parameter name for flexibility - can be email, user ID, etc.
+class DirectServiceProductProvider implements ProductProvider {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async search(query: string, options?: { category?: string; limit?: number }) {
-    const response = await fetch(`${baseUrl}/api/search?q=${encodeURIComponent(query)}&limit=${options?.limit || 10}`);
-    const data = await response.json();
+    // TODO: Implement search filtering based on query and options
+    const allProducts = await getProductsFromSupabase();
     
-    // Map your API response to the expected Product interface
-    return (data.results || []).map((product: APIProduct) => ({
+    // Map to the expected Product interface
+    return allProducts.map(product => ({
       id: product.id,
-      name: product.productName, // Map productName to name
-      description: product.description || product.tagline || '',
+      name: product.productName,
+      description: '',
       price: product.pricing?.price || 0,
       category: product.category || '',
-      imageUrl: product.imageUrl,
-      specifications: product.specifications || {}
+      imageUrl: product.imageUrl || '',
+      specifications: {}
     }));
   }
 }
 
-class ServerCartProvider implements CartProvider {
-  async getCart(sessionId: string) {
-    console.log("Fetching cart for session:", sessionId);
-    const response = await fetch(`${baseUrl}/api/cart?sessionId=${sessionId}`);
-    return await response.json();
+class DirectServiceCartProvider implements CartProvider {
+  async getCart(userIdentifier: string) {
+    console.log("Fetching cart for user:", userIdentifier);
+    const cartItems = await getCartFromSupabase(userIdentifier);
+    
+    const mappedCartItems: CartItem[] = cartItems.map(item => ({
+      id: item.id,
+      name: item.productName,
+      price: item.price,
+      quantity: item.quantity,
+      imageUrl: item.imageUrl,
+      addedAt: item.addedAt
+    }));
+    
+    return {
+      items: mappedCartItems,
+      totalItems: mappedCartItems.reduce((sum: number, item: CartItem) => sum + item.quantity, 0),
+      totalAmount: mappedCartItems.reduce((sum: number, item: CartItem) => sum + (item.price * item.quantity), 0),
+      sessionId: userIdentifier
+    };
   }
 
-  async addItems(sessionId: string, items: Array<{ productId: string; quantity: number }>) {
-    
-    // Get all products and find the ones we need by ID
-    const productsResponse = await fetch(`${baseUrl}/api/products`);
-    const allProducts: APIProduct[] = await productsResponse.json();
+  async addItems(userIdentifier: string, items: Array<{ productId: string; quantity: number }>) {
+    const allProducts = await getProductsFromSupabase();
     
     const cartItems = [];
     for (const item of items) {
-      const product = allProducts.find((p: APIProduct) => p.id === item.productId);
+      const product = allProducts.find(p => p.id === item.productId);
       if (product && product.pricing) {
         cartItems.push({
           id: item.productId,
@@ -75,40 +83,44 @@ class ServerCartProvider implements CartProvider {
         });
       }
     }
+    await saveCartToSupabase(userIdentifier, cartItems);
+    return await this.getCart(userIdentifier);
+  }
+
+  async removeItems(userIdentifier: string, items: Array<{ productId: string; quantity?: number; removeAll?: boolean }>) {
+    // Map to the format expected by deleteCartFromSupabase
+    const cartItemsToRemove = items.map(item => ({
+      productId: item.productId,
+      quantity: item.quantity || 0
+    }));
     
-    const response = await fetch(`${baseUrl}/api/cart`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, items: cartItems })
-    });
-    return await response.json();
+    await deleteCartFromSupabase(userIdentifier, cartItemsToRemove);
+    return await this.getCart(userIdentifier);
   }
 
-  async removeItems(sessionId: string, items: Array<{ productId: string; quantity?: number; removeAll?: boolean }>) {
-    const response = await fetch(`${baseUrl}/api/cart`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, items })
-    });
-    return await response.json();
-  }
-
-  async clearCart(sessionId: string) {
-    const response = await fetch(`${baseUrl}/api/cart`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId })
-    });
-    return await response.json();
+  async clearCart(userIdentifier: string) {
+    await deleteCartFromSupabase(userIdentifier);
+    return await this.getCart(userIdentifier);
   }
 }
 
-class ServerProfileProvider implements ProfileProvider {
-  async getShippingAddress(userEmail: string) {
-    const response = await fetch(`${baseUrl}/api/profile?userEmail=${encodeURIComponent(userEmail)}`);
-    if (!response.ok) return null;
-    const profile = await response.json();
-    return profile.profile?.shippingAddress || null;
+class DirectServiceProfileProvider implements ProfileProvider {
+  async getShippingAddress(userIdentifier: string) {
+    const profile = await getUserProfileFromSupabase(userIdentifier);
+    
+    if (!profile?.shippingAddress) return null;
+    
+    return {
+      firstName: profile.shippingAddress.firstName || '',
+      lastName: profile.shippingAddress.lastName || '',
+      address1: profile.shippingAddress.address1 || '',
+      address2: profile.shippingAddress.address2 || '',
+      city: profile.shippingAddress.city || '',
+      state: profile.shippingAddress.state || '',
+      zipCode: profile.shippingAddress.postalCode || '',
+      country: profile.shippingAddress.country || '',
+      phone: profile.shippingAddress.phone || ''
+    };
   }
 }
 
@@ -119,10 +131,10 @@ const aiConfig = createAIShoppingConfig({
     apiKey: process.env.AZURE_OPENAI_API_KEY!,
     deploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4'
   },
-  productProvider: new ServerProductProvider(),
-  cartProvider: new ServerCartProvider(),
+  productProvider: new DirectServiceProductProvider(),
+  cartProvider: new DirectServiceCartProvider(),
+  profileProvider: new DirectServiceProfileProvider(),
   paymentProvider: new StripePaymentProvider(process.env.STRIPE_SECRET_KEY!),
-  profileProvider: new ServerProfileProvider(),
   orderCalculations: {
     currency: 'USD',
     taxProvider: new USTaxProvider(), // State-based tax calculation
@@ -146,11 +158,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 });
     }
 
-    console.log('Processing AI chat for user:', session.user.email);
+    // Use email as user identifier for this implementation
+    const userIdentifier = session.user.email;
+    
+    console.log('Processing AI chat for user:', userIdentifier);
     console.log('Messages:', messages.length);
 
     // Process chat using AI engine
-    const response = await aiEngine.processChat(messages, session.user.email);
+    const response = await aiEngine.processChat(messages, userIdentifier);
 
     return NextResponse.json({
       message: response,

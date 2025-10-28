@@ -19,7 +19,7 @@ export class USTaxProvider implements TaxProvider {
 
   calculateTax(context: TaxCalculationContext): number {
     const state = context.shippingAddress?.state;
-    console.log("Shipping address: ", context.shippingAddress)
+    // console.log("Shipping address: ", context.shippingAddress)
     const taxRate = state ? this.stateTaxRates[state] || 0.08 : 0.08; // Default 8%
     return context.subtotal * taxRate;
   }

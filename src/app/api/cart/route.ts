@@ -5,20 +5,22 @@ import { CartItem, getCartFromSupabase, saveCartToSupabase, deleteCartFromSupaba
 
 export const runtime = 'nodejs';
 
-// GET /api/cart - Get cart items for a session
-export async function GET(request: NextRequest) {
+// GET /api/cart - Get cart items for authenticated user
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get('sessionId');
+    // Get authenticated session
+    const session = await getServerSession(authOptions);
     
-    if (!sessionId) {
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: 'Session ID is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
     
-    const cartItems = await getCartFromSupabase(sessionId);
+    // Use email from authenticated session as cart identifier
+    const userEmail = session.user.email;
+    const cartItems = await getCartFromSupabase(userEmail);
     
     const response = NextResponse.json({
       success: true,
@@ -44,18 +46,21 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/cart - Save cart items for a session
+// POST /api/cart - Save cart items for authenticated user
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { sessionId, items } = body;
-
-    if (!sessionId) {
+    // Get authenticated session
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: 'Session ID is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
+    
+    const body = await request.json();
+    const { items } = body; // sessionId no longer needed - use auth
     
     if (!Array.isArray(items)) {
       return NextResponse.json(
@@ -74,8 +79,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    
-    await saveCartToSupabase(sessionId, items);
+    // Use email from authenticated session
+    const userEmail = session.user.email;
+    await saveCartToSupabase(userEmail, items);
     
     const response = NextResponse.json({
       success: true,
@@ -100,29 +106,33 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE /api/cart - Clear cart for a session
+// DELETE /api/cart - Clear cart for authenticated user
 export async function DELETE(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { sessionId, items } = body;
+    // Get authenticated session
+    const session = await getServerSession(authOptions);
     
-    if(!sessionId) {
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { error: 'Session ID is required' },
-        { status: 400 }
+        { error: 'Unauthorized' },
+        { status: 401 }
       );
     }
-
+    
+    const body = await request.json();
+    const { items } = body; // sessionId no longer needed - use auth
+    
+    const userEmail = session.user.email;
     let response;
     
     if(items && items.length > 0 ) {
-      await deleteCartFromSupabase(sessionId, items);
+      await deleteCartFromSupabase(userEmail, items);
       response = NextResponse.json({
         success: true,
         message: 'Items removed from cart successfully',
       });
     } else {
-      await deleteCartFromSupabase(sessionId);
+      await deleteCartFromSupabase(userEmail);
       response = NextResponse.json({
         success: true,
         message: 'Cart cleared successfully',

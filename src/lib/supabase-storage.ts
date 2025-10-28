@@ -133,6 +133,120 @@ export const BUCKETS = {
   PROFILES: 'profiles'
 } as const;
 
+// ========================================
+// CART CACHING
+// ========================================
+
+// In-memory cart cache to reduce Supabase calls
+interface CartCacheEntry {
+  items: CartItem[];
+  lastUpdated: number;
+  ttl: number; // Time to live in milliseconds
+}
+
+const cartCache = new Map<string, CartCacheEntry>();
+
+// Cache configuration
+const CART_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CART_CACHE_MAX_SIZE = 1000; // Maximum number of cached carts
+
+// Helper functions for cart cache management
+function getCachedCart(sessionId: string): CartItem[] | null {
+  const entry = cartCache.get(sessionId);
+  if (!entry) {
+    return null;
+  }
+  
+  // Check if cache entry is still valid
+  const now = Date.now();
+  if (now - entry.lastUpdated > entry.ttl) {
+    cartCache.delete(sessionId);
+    return null;
+  }
+  
+  console.log(`Cache HIT for cart: ${sessionId}`);
+  return entry.items;
+}
+
+function setCachedCart(sessionId: string, items: CartItem[]): void {
+  // Implement simple LRU eviction if cache is full
+  if (cartCache.size >= CART_CACHE_MAX_SIZE) {
+    // Remove oldest entry
+    const oldestKey = cartCache.keys().next().value;
+    if (oldestKey) {
+      cartCache.delete(oldestKey);
+    }
+  }
+  
+  cartCache.set(sessionId, {
+    items: items,
+    lastUpdated: Date.now(),
+    ttl: CART_CACHE_TTL
+  });
+  
+  console.log(`Cache SET for cart: ${sessionId} (${items.length} items)`);
+}
+
+function invalidateCartCache(sessionId: string): void {
+  cartCache.delete(sessionId);
+  console.log(`Cache INVALIDATED for cart: ${sessionId}`);
+}
+
+// Clear all expired cache entries (can be called periodically)
+export function clearExpiredCartCache(): number {
+  const now = Date.now();
+  let cleared = 0;
+  
+  for (const [sessionId, entry] of cartCache.entries()) {
+    if (now - entry.lastUpdated > entry.ttl) {
+      cartCache.delete(sessionId);
+      cleared++;
+    }
+  }
+  
+  if (cleared > 0) {
+    console.log(`Cleared ${cleared} expired cart cache entries`);
+  }
+  
+  return cleared;
+}
+
+// Get cache statistics for monitoring
+export function getCartCacheStats() {
+  const now = Date.now();
+  let validEntries = 0;
+  let expiredEntries = 0;
+  let totalItems = 0;
+  
+  for (const [, entry] of cartCache.entries()) {
+    if (now - entry.lastUpdated > entry.ttl) {
+      expiredEntries++;
+    } else {
+      validEntries++;
+      totalItems += entry.items.length;
+    }
+  }
+  
+  return {
+    totalCacheEntries: cartCache.size,
+    validEntries,
+    expiredEntries,
+    totalCachedItems: totalItems,
+    maxCacheSize: CART_CACHE_MAX_SIZE,
+    cacheTtlMs: CART_CACHE_TTL,
+    memoryUsageEstimate: cartCache.size * 1024 // Rough estimate in bytes
+  };
+}
+
+// Force refresh cart cache from Supabase (useful for cache warming or forced refresh)
+export async function refreshCartCache(sessionId: string): Promise<CartItem[]> {
+  // First invalidate existing cache
+  invalidateCartCache(sessionId);
+  
+  // Then fetch fresh data from Supabase
+  return await getCartFromSupabase(sessionId);
+}
+
 // File paths
 const FILES = {
   PRODUCTS_INDEX: 'products-index.json',
@@ -400,7 +514,7 @@ export async function saveImageToSupabase(
 }
 
 // Cart storage functions
-export async function saveCartToSupabase(sessionId: string, cartItems: CartItem[]): Promise<void> {
+export async function saveCartToSupabase(sessionId: string, cartItems: CartItem[]): Promise<CartItem[]> {
   try {
     const fileName = `${sessionId}.json`;
     
@@ -452,7 +566,11 @@ export async function saveCartToSupabase(sessionId: string, cartItems: CartItem[
       throw new Error(`Failed to save cart: ${error.message}`);
     }
     
+    // Update cache with the merged items
+    setCachedCart(sessionId, mergedItems);
+    
     console.log('Cart merged and saved to Supabase for session:', sessionId);
+    return mergedItems;
   } catch (error) {
     console.error('Error saving cart to Supabase:', error);
     throw error;
@@ -461,6 +579,14 @@ export async function saveCartToSupabase(sessionId: string, cartItems: CartItem[
 
 export async function getCartFromSupabase(sessionId: string): Promise<CartItem[]> {
   try {
+    // Check cache first
+    const cachedItems = getCachedCart(sessionId);
+    if (cachedItems !== null) {
+      return cachedItems;
+    }
+    
+    console.log(`Cache MISS for cart: ${sessionId}, fetching from Supabase...`);
+    
     const fileName = `${sessionId}.json`;
     
     const { data, error } = await supabaseAdmin.storage
@@ -468,11 +594,18 @@ export async function getCartFromSupabase(sessionId: string): Promise<CartItem[]
       .download(fileName);
     
     if (error || !data) {
+      // Cache empty cart to avoid repeated requests for non-existent carts
+      setCachedCart(sessionId, []);
       return []; // Return empty cart if not found
     }
     
     const text = await data.text();
-    return JSON.parse(text);
+    const items = JSON.parse(text);
+    
+    // Cache the retrieved items
+    setCachedCart(sessionId, items);
+    
+    return items;
   } catch (error) {
     console.error('Error fetching cart from Supabase:', error);
     return [];
@@ -497,6 +630,8 @@ export async function deleteCartFromSupabase(sessionId: string, cartItems?: {pro
       cartItems.forEach(item => {
         itemsToRemoveMap.set(item.productId, item.quantity);
       });
+
+      console.log("Items to remove:", cartItems);
       
       // Process existing items and subtract quantities
       const updatedItems: CartItem[] = [];
@@ -506,7 +641,7 @@ export async function deleteCartFromSupabase(sessionId: string, cartItems?: {pro
         
         if (quantityToRemove !== undefined) {
           // Item is in removal list, subtract quantity
-          const newQuantity = existingItem.quantity - quantityToRemove;
+          const newQuantity = quantityToRemove === 0 ? 0 : existingItem.quantity - quantityToRemove;
           
           if (newQuantity > 0) {
             // Keep item with reduced quantity
@@ -538,6 +673,11 @@ export async function deleteCartFromSupabase(sessionId: string, cartItems?: {pro
         throw new Error(`Failed to update cart after removal: ${error.message}`);
       }
       
+      // Update cache with the updated items
+      setCachedCart(sessionId, updatedItems);
+
+      console.log("updated after delete:", updatedItems);
+      
       console.log(`Selectively removed items from cart for session: ${sessionId}. Items remaining: ${updatedItems.length}`);
     } else {
       // Complete deletion: remove entire cart file
@@ -550,6 +690,9 @@ export async function deleteCartFromSupabase(sessionId: string, cartItems?: {pro
       } else {
         console.log(`Entire cart deleted for session: ${sessionId}`);
       }
+      
+      // Invalidate cache for complete deletion
+      invalidateCartCache(sessionId);
     }
   } catch (error) { 
     console.error('Error in deleteCartFromSupabase:', error);
