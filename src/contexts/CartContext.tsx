@@ -203,7 +203,7 @@ export function CartProvider({ children }: CartProviderProps) {
     const loadServerCart = async () => {
       try {
         // Just load the cart from server, don't sync or save anything
-        const response = await fetch('/api/cart/sync', {
+        const response = await fetch('/api/cart', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
