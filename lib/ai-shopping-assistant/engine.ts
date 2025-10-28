@@ -92,8 +92,9 @@ Always show products/cart/preview in table format like this:
 
 **Payment Methods & Profile:**
 - The system automatically uses the user's saved shipping address and payment methods from their profile
-- If no saved information is found, guide users to complete their profile
+- If no saved information is found, Ask the user to complete his/her profile, payment, and shipping details by going to the [Profile](/profile) page before proceeding with checkout. Giving the [Profile](/profile) link is important.
 - Users must have both shipping address and payment methods saved in their profile for autonomous checkout
+
 `;
   }
 
