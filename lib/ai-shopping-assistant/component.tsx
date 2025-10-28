@@ -12,14 +12,12 @@ interface ChatMessage {
 
 interface AIShoppingAssistantProps {
   chatApiUrl: string; // Required - URL to the AI chat API endpoint
-  userEmail: string; // Required - user's email for authentication
   className?: string;
   style?: React.CSSProperties;
 }
 
 export function AIShoppingAssistant({ 
   chatApiUrl,
-  userEmail,
   className = '',
   style = {} 
 }: AIShoppingAssistantProps) {
@@ -43,7 +41,7 @@ export function AIShoppingAssistant({
   };
 
   const handleSendMessage = async () => {
-    if (!input.trim() || isLoading || !userEmail) return;
+    if (!input.trim() || isLoading ) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -63,8 +61,7 @@ export function AIShoppingAssistant({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage],
-          userEmail: userEmail // Pass user email for authentication
+          messages: [...messages, userMessage]
         })
       });
 
@@ -102,14 +99,6 @@ export function AIShoppingAssistant({
       handleSendMessage();
     }
   };
-
-  if (!userEmail) {
-    return (
-      <div className={`flex items-center justify-center h-full ${className}`} style={style}>
-        <p className="text-gray-500">User email is required for the AI shopping assistant.</p>
-      </div>
-    );
-  }
 
   return (
     <div className={`flex flex-col h-full bg-white ${className}`} style={style}>

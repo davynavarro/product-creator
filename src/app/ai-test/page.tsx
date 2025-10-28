@@ -17,7 +17,6 @@ export default function AITestPage() {
             {session?.user?.email ? (
               <AIShoppingAssistant 
                 chatApiUrl="/api/ai-chat"
-                userEmail={session.user.email}
                 className="w-full h-full"
                 style={{ border: 'none', borderRadius: 0, boxShadow: 'none' }}
               />
