@@ -98,7 +98,6 @@ export interface CustomerInfo {
 // Provider Interfaces
 export interface ProductProvider {
   search(query: string, options?: { category?: string; limit?: number }): Promise<Product[]>;
-  getCategories?(): Promise<Array<{ id: string; name: string }>>;
 }
 
 export interface CartProvider {

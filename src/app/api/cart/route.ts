@@ -103,40 +103,33 @@ export async function POST(request: NextRequest) {
 // DELETE /api/cart - Clear cart for a session
 export async function DELETE(request: NextRequest) {
   try {
-    let sessionId: string;
+    const body = await request.json();
+    const { sessionId, items } = body;
     
-    // Try to get sessionId from request body first (for server-side calls)
-    try {
-      const body = await request.json();
-      if (body.sessionId) {
-        sessionId = body.sessionId;
-      } else {
-        // Fall back to session-based authentication
-        const session = await getServerSession(authOptions);
-        
-        if (!session?.user?.email) {
-          return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-        }
-        
-        sessionId = session.user.email;
-      }
-    } catch {
-      // If no body or invalid JSON, use session-based authentication
-      const session = await getServerSession(authOptions);
-      
-      if (!session?.user?.email) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-      }
-      
-      sessionId = session.user.email;
+    if(!sessionId) {
+      return NextResponse.json(
+        { error: 'Session ID is required' },
+        { status: 400 }
+      );
     }
 
-    await deleteCartFromSupabase(sessionId);
+    let response;
     
-    const response = NextResponse.json({
-      success: true,
-      message: 'Cart cleared successfully',
-    });
+    if(items && items.length > 0 ) {
+      await deleteCartFromSupabase(sessionId, items);
+      response = NextResponse.json({
+        success: true,
+        message: 'Items removed from cart successfully',
+      });
+    } else {
+      await deleteCartFromSupabase(sessionId);
+      response = NextResponse.json({
+        success: true,
+        message: 'Cart cleared successfully',
+      });
+    }
+
+  
 
     // Disable all caching
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

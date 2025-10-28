@@ -6,9 +6,10 @@ import {
   AIShoppingEngine,
   StripePaymentProvider,
   createAIShoppingConfig,
+  USTaxProvider,
+  TieredShippingProvider,
   type ProductProvider,
   type CartProvider,
-  type PaymentProvider,
   type ProfileProvider
 } from '../../../../lib/ai-shopping-assistant';
 
@@ -49,6 +50,7 @@ class ServerProductProvider implements ProductProvider {
 
 class ServerCartProvider implements CartProvider {
   async getCart(sessionId: string) {
+    console.log("Fetching cart for session:", sessionId);
     const response = await fetch(`${baseUrl}/api/cart?sessionId=${sessionId}`);
     return await response.json();
   }
@@ -120,7 +122,12 @@ const aiConfig = createAIShoppingConfig({
   productProvider: new ServerProductProvider(),
   cartProvider: new ServerCartProvider(),
   paymentProvider: new StripePaymentProvider(process.env.STRIPE_SECRET_KEY!),
-  profileProvider: new ServerProfileProvider()
+  profileProvider: new ServerProfileProvider(),
+  orderCalculations: {
+    currency: 'USD',
+    taxProvider: new USTaxProvider(), // State-based tax calculation
+    shippingProvider: new TieredShippingProvider() // Tiered shipping calculation
+  }
 });
 
 const aiEngine = new AIShoppingEngine(aiConfig, baseUrl);

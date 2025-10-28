@@ -404,18 +404,55 @@ export async function saveCartToSupabase(sessionId: string, cartItems: CartItem[
   try {
     const fileName = `${sessionId}.json`;
     
+    // First, get existing cart items
+    const existingItems = await getCartFromSupabase(sessionId);
+
+    // Create a map of existing items by ID for quick lookup
+    const existingItemsMap = new Map<string, CartItem>();
+    existingItems.forEach(item => {
+      existingItemsMap.set(item.id, item);
+    });
+    
+    // Merge new items with existing ones
+    const mergedItems: CartItem[] = [];
+    
+    // Process new items
+    cartItems.forEach(newItem => {
+      const existingItem = existingItemsMap.get(newItem.id);
+      if (existingItem) {
+        // Item exists, update quantity and use the newer addedAt timestamp
+        mergedItems.push({
+          ...existingItem,
+          quantity: newItem.quantity + existingItem.quantity, 
+        });
+        // Mark as processed
+        existingItemsMap.delete(newItem.id);
+      } else {
+        // New item, add it
+        mergedItems.push(newItem);
+      }
+    });
+    
+    // Add any remaining existing items that weren't updated
+    existingItemsMap.forEach(item => {
+      mergedItems.push(item);
+    });
+    
+    // Sort by addedAt timestamp (newest first)
+    mergedItems.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    
     const { error } = await supabaseAdmin.storage
       .from(BUCKETS.CART)
-      .upload(fileName, JSON.stringify(cartItems, null, 2), {
+      .upload(fileName, JSON.stringify(mergedItems, null, 2), {
         contentType: 'application/json',
         upsert: true
       });
-    
+
     if (error) {
       throw new Error(`Failed to save cart: ${error.message}`);
     }
     
-    console.log('Cart saved to Supabase for session:', sessionId);
+    console.log('Cart merged and saved to Supabase for session:', sessionId);
   } catch (error) {
     console.error('Error saving cart to Supabase:', error);
     throw error;
@@ -426,7 +463,7 @@ export async function getCartFromSupabase(sessionId: string): Promise<CartItem[]
   try {
     const fileName = `${sessionId}.json`;
     
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseAdmin.storage
       .from(BUCKETS.CART)
       .download(fileName);
     
@@ -442,19 +479,80 @@ export async function getCartFromSupabase(sessionId: string): Promise<CartItem[]
   }
 }
 
-export async function deleteCartFromSupabase(sessionId: string): Promise<void> {
+export async function deleteCartFromSupabase(sessionId: string, cartItems?: {productId: string, quantity: number}[]): Promise<void> {
   try {
     const fileName = `${sessionId}.json`;
     
-    const { error } = await supabaseAdmin.storage
-      .from(BUCKETS.CART)
-      .remove([fileName]);
-    
-    if (error) {
-      console.error('Error deleting cart from Supabase:', error);
+    if (cartItems && cartItems.length > 0) {
+      // Selective deletion: remove specific items from cart
+      const existingItems = await getCartFromSupabase(sessionId);
+      
+      if (existingItems.length === 0) {
+        console.log('No existing cart items to remove from');
+        return;
+      }
+      
+      // Create a map of items to remove for quick lookup
+      const itemsToRemoveMap = new Map<string, number>();
+      cartItems.forEach(item => {
+        itemsToRemoveMap.set(item.productId, item.quantity);
+      });
+      
+      // Process existing items and subtract quantities
+      const updatedItems: CartItem[] = [];
+      
+      existingItems.forEach(existingItem => {
+        const quantityToRemove = itemsToRemoveMap.get(existingItem.id);
+        
+        if (quantityToRemove !== undefined) {
+          // Item is in removal list, subtract quantity
+          const newQuantity = existingItem.quantity - quantityToRemove;
+          
+          if (newQuantity > 0) {
+            // Keep item with reduced quantity
+            updatedItems.push({
+              ...existingItem,
+              quantity: newQuantity
+            });
+          }
+          // If newQuantity <= 0, item is completely removed (not added to updatedItems)
+          
+          console.log(`Item ${existingItem.id}: ${existingItem.quantity} - ${quantityToRemove} = ${newQuantity}${newQuantity <= 0 ? ' (removed)' : ''}`);
+        } else {
+          // Item not in removal list, keep as is
+          updatedItems.push(existingItem);
+        }
+      });
+
+      // console.log(`Updated cart for session: ${sessionId}. Items remaining: ${updatedItems.length}`);
+      
+      // Save updated cart
+      const { error } = await supabaseAdmin.storage
+        .from(BUCKETS.CART)
+        .upload(fileName, JSON.stringify(updatedItems, null, 2), {
+          contentType: 'application/json',
+          upsert: true
+        });
+      
+      if (error) {
+        throw new Error(`Failed to update cart after removal: ${error.message}`);
+      }
+      
+      console.log(`Selectively removed items from cart for session: ${sessionId}. Items remaining: ${updatedItems.length}`);
+    } else {
+      // Complete deletion: remove entire cart file
+      const { error } = await supabaseAdmin.storage
+        .from(BUCKETS.CART)
+        .remove([fileName]);
+      
+      if (error) {
+        console.error('Error deleting entire cart from Supabase:', error);
+      } else {
+        console.log(`Entire cart deleted for session: ${sessionId}`);
+      }
     }
-  } catch (error) {
-    console.error('Error deleting cart from Supabase:', error);
+  } catch (error) { 
+    console.error('Error in deleteCartFromSupabase:', error);
     throw error;
   }
 }
@@ -462,7 +560,7 @@ export async function deleteCartFromSupabase(sessionId: string): Promise<void> {
 // Category functions
 export async function getCategoriesFromSupabase(): Promise<Category[]> {
   try {
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseAdmin.storage
       .from(BUCKETS.CATEGORIES)
       .download(FILES.CATEGORIES);
     
@@ -789,7 +887,7 @@ export async function getOrderFromSupabase(orderId: string): Promise<OrderData |
   try {
     const fileName = `${orderId}.json`;
     
-    const { data, error } = await supabase.storage
+    const { data, error } = await supabaseAdmin.storage
       .from(BUCKETS.ORDERS)
       .download(fileName);
     

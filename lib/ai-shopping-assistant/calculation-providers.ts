@@ -10,6 +10,7 @@ export class USTaxProvider implements TaxProvider {
   private stateTaxRates: Record<string, number> = {
     'CA': 0.0725, // California
     'NY': 0.08,   // New York
+    'IL': 0.05,   // Illinois
     'TX': 0.0625, // Texas
     'FL': 0.06,   // Florida
     'WA': 0.065,  // Washington
@@ -18,6 +19,7 @@ export class USTaxProvider implements TaxProvider {
 
   calculateTax(context: TaxCalculationContext): number {
     const state = context.shippingAddress?.state;
+    console.log("Shipping address: ", context.shippingAddress)
     const taxRate = state ? this.stateTaxRates[state] || 0.08 : 0.08; // Default 8%
     return context.subtotal * taxRate;
   }
