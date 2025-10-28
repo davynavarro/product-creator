@@ -529,7 +529,7 @@ async function executeTool(toolName: string, parameters: Record<string, unknown>
           // Check if user has payment methods in Stripe
           try {
             const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-              apiVersion: '2025-09-30.clover',
+              apiVersion: '2025-09-30.clover' as unknown as Stripe.LatestApiVersion,
             });
             const customers = await stripe.customers.list({
               email: userEmail,

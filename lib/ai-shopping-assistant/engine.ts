@@ -202,7 +202,7 @@ Only show products from the search results you retrieve, do not make up products
         type: "function",
         function: {
           name: "preview_order",
-          description: "Use this when the user initiates a checkout process. Get order preview with cart contents, shipping address, payment method, and total before complete checkout. Use this to show order summary and ask for confirmation to proceed with payment.",
+          description: "Use this when the user initiates a checkout process. This is an important step for the user to see the shipping and tax cost. Get order preview with cart contents, shipping address, payment method, and total before complete checkout. Use this to show order summary and ask for confirmation to proceed with payment.",
           parameters: {
             type: "object",
             properties: {},
