@@ -70,6 +70,7 @@ You are a helpful shopping assistant for an e-commerce platform with autonomous 
 - Complete purchases on user's behalf when requested
 
 **Searching and Managing the Cart:**
+- When you get the search results, be smart enough to only display the products that are significant to what the user is looking for.
 - Understand the user's intent and add items to cart after doing search, if they ask you to do so.
 
 **Product Recommendations:**
@@ -460,10 +461,98 @@ Always show products/cart/preview in table format like this:
         error: paymentResult.error || 'Payment processing failed'
       };
     }
+
+
+  }
+
+  private async orchestrateChatCompletion(messages: ChatMessage[], userEmail: string): Promise<string> {
+    try {
+
+      const massagedMessages = messages.map(msg => {
+          const message = {
+            role: msg.role,
+            content: msg.content
+          }
+          if (msg.tool_call_id) {
+            return { ...message, tool_call_id: msg.tool_call_id };
+          }
+          if (msg.tool_calls) {
+            return { ...message, tool_calls: msg.tool_calls };
+          }
+          return message;
+      })
+
+      let addRemindertoContinue = false;
+      if(messages[messages.length -1 ].role === 'tool') {
+        addRemindertoContinue = true;
+      }
+
+      const response = await fetch(`${this.config.azureOpenAI.endpoint}/openai/deployments/${this.config.azureOpenAI.deploymentName}/chat/completions?api-version=2024-12-01-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': this.config.azureOpenAI.apiKey,
+        },
+        body: JSON.stringify({
+          messages: !addRemindertoContinue ? 
+                    massagedMessages : 
+                    [...massagedMessages, { role: 'system', content: 'Continue based on the tool results provided.' }],
+          tools: this.getTools(),
+          tool_choice: "auto",
+          max_tokens: 2000,
+          temperature: 0.7,
+          top_p: 0.9,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Azure OpenAI error:', response.status, errorText);
+        throw new Error(`Azure OpenAI API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const assistantMessage = result.choices[0]?.message;
+
+      // Check if the assistant wants to call tools
+      if (assistantMessage?.tool_calls) {
+        // Add the assistant message with tool calls to conversation
+        // console.log(assistantMessage)
+        const toolMessages = [...messages, assistantMessage];
+
+        // Execute each tool call
+        for (const toolCall of assistantMessage.tool_calls) {
+          const toolResult = await this.executeTool(
+            toolCall.function.name,
+            JSON.parse(toolCall.function.arguments),
+            userEmail
+          );
+          
+          // Add tool result to conversation
+          toolMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolResult)
+          });
+        }
+        toolMessages.push({
+          role: 'system',
+          content: "Continue based on the tool results provided."
+        })
+        // Make another call to the orchestrateChatCompletion
+        return await this.orchestrateChatCompletion(toolMessages, userEmail);
+      } else {
+        return assistantMessage?.content || 'I apologize, but I cannot process your request right now.';
+      }
+    }
+    catch (error) {
+      console.error('Error in orchestrateChatCompletion:', error);
+      throw new Error('Failed to get AI response');
+    }
   }
 
   // Main chat completion method
-  async processChat(messages: ChatMessage[], userEmail: string): Promise<string> {
+  async processChat2(messages: ChatMessage[], userEmail: string): Promise<string> {
     if (!this.config.azureOpenAI.endpoint || !this.config.azureOpenAI.apiKey) {
       throw new Error('Azure OpenAI configuration missing');
     }
@@ -552,5 +641,20 @@ Always show products/cart/preview in table format like this:
       console.error('Error calling Azure OpenAI:', error);
       throw new Error('Failed to get AI response');
     }
+  }
+
+  async processChat(messages: ChatMessage[], userEmail: string): Promise<string> {
+    if (!this.config.azureOpenAI.endpoint || !this.config.azureOpenAI.apiKey) {
+      throw new Error('Azure OpenAI configuration missing');
+    }
+
+    // Add system message
+    const systemMessage: ChatMessage = {
+      role: 'system',
+      content: this.getSystemPrompt()
+    };
+
+    const chatMessages = [systemMessage, ...messages];
+    return await this.orchestrateChatCompletion(chatMessages, userEmail);
   }
 }

@@ -161,10 +161,12 @@ export interface AIShoppingConfig {
 
 // Chat Types
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp?: string;
   actions?: ChatAction[];
+  tool_call_id?: string;
+  tool_calls?: unknown[];
 }
 
 export interface ChatAction {
