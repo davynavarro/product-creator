@@ -328,6 +328,7 @@ Always show products/cart/preview in table format like this:
     const cart = await this.config.cartProvider.getCart(userEmail);
     const customerInfo = await this.config.paymentProvider.validateCustomer(userEmail);
     const shippingAddress = await this.config.profileProvider.getShippingAddress(userEmail);
+    customerInfo.hasShippingAddress = !!shippingAddress;
     
     // Calculate order totals with tax and shipping using configurable providers
     const orderTotals = await calculateOrderTotals(cart.items || [], this.config, shippingAddress || undefined);
