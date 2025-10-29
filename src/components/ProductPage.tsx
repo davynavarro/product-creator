@@ -40,7 +40,7 @@ export default function ProductPage({ productData, imageUrl, productId, onBack }
     if (onBack) {
       onBack();
     } else {
-      router.push('/');
+      router.push('/products');
     }
   };
 
@@ -87,7 +87,7 @@ export default function ProductPage({ productData, imageUrl, productId, onBack }
               className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="h-5 w-5" />
-              <span>Back to Builder</span>
+              <span>Back to Products</span>
             </button>
             
             {productId && (
