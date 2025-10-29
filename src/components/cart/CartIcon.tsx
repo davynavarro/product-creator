@@ -13,7 +13,7 @@ export default function CartIcon() {
     <div className="relative">
       <button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors duration-200"
+        className="cursor-pointer relative p-2 text-gray-600 hover:text-gray-900 transition-colors duration-200"
         aria-label={`Shopping cart with ${state.totalItems} items`}
       >
         <ShoppingCart className="h-6 w-6" />

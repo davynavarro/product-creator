@@ -120,7 +120,7 @@ export default function AddToCartButton({
       <button
         onClick={handleAddToCart}
         disabled={isAdding}
-        className={`${buttonStyles} ${className}`}
+        className={`${buttonStyles} ${className} cursor-pointer `}
         aria-label={`Add ${product.productName} to cart`}
       >
         {isAdding ? (

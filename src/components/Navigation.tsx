@@ -80,7 +80,7 @@ export default function Navigation() {
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                  className="cursor-pointer flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   {session.user?.image ? (
                     <Image
@@ -142,7 +142,7 @@ export default function Navigation() {
                         setShowUserMenu(false);
                         signOut();
                       }}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="cursor-pointer flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       <LogOut className="h-4 w-4 mr-3" />
                       Sign Out
@@ -153,7 +153,7 @@ export default function Navigation() {
             ) : (
               <button
                 onClick={() => signIn()}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
               >
                 Sign In
               </button>
