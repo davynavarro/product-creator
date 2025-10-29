@@ -123,6 +123,45 @@ export interface ProfileProvider {
   getShippingAddress(userEmail: string): Promise<ShippingAddress | null>;
 }
 
+export interface OrderProvider {
+  saveOrder(orderData: OrderData, userEmail: string): Promise<{ success: boolean; orderId: string; error?: string }>;
+}
+
+export interface OrderData {
+  orderId: string;
+  paymentIntentId: string;
+  customerInfo: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+  shippingAddress: {
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  items: Array<{
+    id: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    currency: string;
+  }>;
+  totals: {
+    subtotal: number;
+    shipping: number;
+    tax: number;
+    total: number;
+    currency: string;
+  };
+  status: 'confirmed' | 'processing' | 'shipped' | 'delivered';
+  createdAt: string;
+  userId: string;
+}
+
 // Configuration Interface
 export interface AIShoppingConfig {
   // AI Configuration
@@ -138,6 +177,7 @@ export interface AIShoppingConfig {
   paymentProvider: PaymentProvider;
   authProvider?: AuthProvider;  // Optional - may be handled at API level
   profileProvider: ProfileProvider;
+  orderProvider: OrderProvider;
   
   // Order Calculations (optional - falls back to defaults)
   orderCalculations?: OrderCalculationsProvider;

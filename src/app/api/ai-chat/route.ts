@@ -11,14 +11,17 @@ import {
   type ProductProvider,
   type CartProvider,
   type ProfileProvider,
-  type CartItem
+  type OrderProvider,
+  type CartItem,
+  type OrderData
 } from '../../../../lib/ai-shopping-assistant';
 import { 
   getProductsFromSupabase, 
   getCartFromSupabase, 
   saveCartToSupabase, 
   deleteCartFromSupabase,
-  getUserProfileFromSupabase 
+  getUserProfileFromSupabase,
+  saveOrderToSupabase
 } from '@/lib/supabase-storage';
 
 const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
@@ -124,6 +127,23 @@ class DirectServiceProfileProvider implements ProfileProvider {
   }
 }
 
+class DirectServiceOrderProvider implements OrderProvider {
+  async saveOrder(orderData: OrderData, userEmail: string): Promise<{ success: boolean; orderId: string; error?: string }> {
+    try {
+      console.log('DirectServiceOrderProvider: Saving order for user:', userEmail);
+      const savedOrderId = await saveOrderToSupabase(orderData);
+      return { success: true, orderId: savedOrderId };
+    } catch (error) {
+      console.error('DirectServiceOrderProvider: Error saving order:', error);
+      return { 
+        success: false, 
+        orderId: orderData.orderId, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+}
+
 // Create AI engine with server-side secrets
 const aiConfig = createAIShoppingConfig({
   azureOpenAI: {
@@ -135,6 +155,7 @@ const aiConfig = createAIShoppingConfig({
   cartProvider: new DirectServiceCartProvider(),
   profileProvider: new DirectServiceProfileProvider(),
   paymentProvider: new StripePaymentProvider(process.env.STRIPE_SECRET_KEY!),
+  orderProvider: new DirectServiceOrderProvider(),
   orderCalculations: {
     currency: 'USD',
     taxProvider: new USTaxProvider(), // State-based tax calculation

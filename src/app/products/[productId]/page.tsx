@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import ProductPage from '@/components/ProductPage';
 import { getProductFromSupabase } from '@/lib/supabase-storage';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 interface ProductIndexItem {
   id: string;
   productName: string;
@@ -83,20 +86,7 @@ export default async function ProductPageRoute({ params }: Props) {
 
 // Generate static params for all existing products
 export async function generateStaticParams() {
-  try {
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/products`, {
-      cache: 'no-store'
-    });
-    
-    if (response.ok) {
-      const products: ProductIndexItem[] = await response.json();
-      return products.map((product: ProductIndexItem) => ({
-        productId: product.id,
-      }));
-    }
-    
-    return [];
-  } catch {
-    return [];
-  }
+  // During build time, we can't rely on API routes, so return empty array
+  // This will make the pages dynamic instead of static
+  return [];
 }

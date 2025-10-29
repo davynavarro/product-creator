@@ -1,4 +1,4 @@
-import { ChatMessage, AIShoppingConfig, ToolResult, TaxCalculationContext, ShippingCalculationContext, CartItem, ShippingAddress } from './types';
+import { ChatMessage, AIShoppingConfig, ToolResult, TaxCalculationContext, ShippingCalculationContext, CartItem, ShippingAddress, OrderData } from './types';
 
 // Default order calculations (fallback when no custom providers are configured)
 interface OrderTotals {
@@ -423,24 +423,16 @@ Always show products/cart/preview in table format like this:
           userId: userEmail
         };
 
-        // Save order via API call
-        console.log('Attempting to save order to:', `${this.baseUrl}/api/save-order`);
-        console.log('Order data being sent:', JSON.stringify(orderData, null, 2));
+        // Save order using the configured order provider
+        console.log('Saving order using OrderProvider...');
+        console.log('Order data:', JSON.stringify(orderData, null, 2));
         
-        const saveResponse = await fetch(`${this.baseUrl}/api/save-order`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderData)
-        });
+        const saveResult = await this.config.orderProvider.saveOrder(orderData, userEmail);
 
-        console.log('Save order response status:', saveResponse.status);
-        const responseText = await saveResponse.text();
-        console.log('Save order response:', responseText);
-
-        if (!saveResponse.ok) {
-          console.error('Failed to save order:', responseText);
+        if (saveResult.success) {
+          console.log('Order saved successfully:', saveResult.orderId);
         } else {
-          console.log('Order saved successfully:', orderData.orderId);
+          console.error('Failed to save order:', saveResult.error);
         }
       } catch (saveError) {
         console.error('Error saving order:', saveError);

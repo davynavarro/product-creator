@@ -32,6 +32,8 @@ export type {
   PaymentProvider,
   AuthProvider,
   ProfileProvider,
+  OrderProvider,
+  OrderData,
   TaxProvider,
   ShippingProvider,
   OrderCalculationsProvider,
