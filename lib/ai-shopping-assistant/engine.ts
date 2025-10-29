@@ -524,13 +524,14 @@ Always show products/cart/preview in table format like this:
           toolMessages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
+            name: toolCall.function.name,
             content: JSON.stringify(toolResult)
           });
         }
-        toolMessages.push({
-          role: 'system',
-          content: "Continue based on the tool results provided."
-        })
+        // toolMessages.push({
+        //   role: 'system',
+        //   content: "Continue based on the tool results provided."
+        // })
         // Make another call to the orchestrateChatCompletion
         return await this.orchestrateChatCompletion(toolMessages, userEmail);
       } else {

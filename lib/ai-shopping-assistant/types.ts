@@ -207,6 +207,7 @@ export interface ChatMessage {
   actions?: ChatAction[];
   tool_call_id?: string;
   tool_calls?: unknown[];
+  name?: string;
 }
 
 export interface ChatAction {
