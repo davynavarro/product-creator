@@ -8,12 +8,12 @@ import { TaxProvider, ShippingProvider, TaxCalculationContext, ShippingCalculati
 // Example: US-based tax calculation with state-specific rates
 export class USTaxProvider implements TaxProvider {
   private stateTaxRates: Record<string, number> = {
-    'CA': 0.0725, // California
-    'NY': 0.08,   // New York
-    'IL': 0.05,   // Illinois
-    'TX': 0.0625, // Texas
-    'FL': 0.06,   // Florida
-    'WA': 0.065,  // Washington
+    // 'CA': 0.0725, // California
+    // 'NY': 0.08,   // New York
+    // 'IL': 0.05,   // Illinois
+    // 'TX': 0.0625, // Texas
+    // 'FL': 0.06,   // Florida
+    // 'WA': 0.065,  // Washington
     // Add more states as needed
   };
 
