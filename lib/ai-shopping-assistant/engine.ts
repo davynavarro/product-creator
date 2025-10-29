@@ -466,7 +466,7 @@ Always show products/cart/preview in table format like this:
             content: msg.content
           }
           if (msg.tool_call_id) {
-            return { ...message, tool_call_id: msg.tool_call_id };
+            return { ...message, tool_call_id: msg.tool_call_id, name: msg.name};
           }
           if (msg.tool_calls) {
             return { ...message, tool_calls: msg.tool_calls };
