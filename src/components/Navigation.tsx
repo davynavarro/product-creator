@@ -34,7 +34,7 @@ export default function Navigation() {
           {/* Logo/Brand */}
           <div className="flex items-center">
             <Link href="/" className="text-xl font-bold text-gray-900">
-              GenAI Store
+              Smart Store
             </Link>
           </div>
 
@@ -58,13 +58,7 @@ export default function Navigation() {
                   href="/ai-test"
                   className="text-gray-600 hover:text-gray-900 transition-colors font-medium"
                 >
-                  🤖 AI Assistant
-                </Link>
-                <Link
-                  href="/admin"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Admin
+                  Assistant
                 </Link>
               </>
             )}

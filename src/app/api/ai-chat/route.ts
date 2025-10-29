@@ -13,7 +13,10 @@ import {
   type ProfileProvider,
   type OrderProvider,
   type CartItem,
-  type OrderData
+  type OrderData,
+  type Product,
+  type Cart,
+  type ShippingAddress
 } from '../../../../lib/ai-shopping-assistant';
 import { 
   getProductsFromSupabase, 
@@ -30,7 +33,7 @@ const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 // Note: Using userIdentifier as parameter name for flexibility - can be email, user ID, etc.
 class DirectServiceProductProvider implements ProductProvider {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async search(query: string, options?: { category?: string; limit?: number }) {
+  async search(query: string, options?: { category?: string; limit?: number }): Promise<Product[]> {
     // TODO: Implement search filtering based on query and options
     const allProducts = await getProductsFromSupabase();
     
@@ -38,17 +41,17 @@ class DirectServiceProductProvider implements ProductProvider {
     return allProducts.map(product => ({
       id: product.id,
       name: product.productName,
-      description: '',
+      description: product.productName, // ProductIndexItem doesn't have description, use name as fallback
       price: product.pricing?.price || 0,
       category: product.category || '',
-      imageUrl: product.imageUrl || '',
-      specifications: {}
+      imageUrl: product.imageUrl,
+      specifications: {} // ProductIndexItem doesn't have specifications
     }));
   }
 }
 
 class DirectServiceCartProvider implements CartProvider {
-  async getCart(userIdentifier: string) {
+  async getCart(userIdentifier: string): Promise<Cart> {
     console.log("Fetching cart for user:", userIdentifier);
     const cartItems = await getCartFromSupabase(userIdentifier);
     
@@ -57,8 +60,7 @@ class DirectServiceCartProvider implements CartProvider {
       name: item.productName,
       price: item.price,
       quantity: item.quantity,
-      imageUrl: item.imageUrl,
-      addedAt: item.addedAt
+      imageUrl: item.imageUrl
     }));
     
     return {
@@ -69,7 +71,7 @@ class DirectServiceCartProvider implements CartProvider {
     };
   }
 
-  async addItems(userIdentifier: string, items: Array<{ productId: string; quantity: number }>) {
+  async addItems(userIdentifier: string, items: Array<{ productId: string; quantity: number }>): Promise<Cart> {
     const allProducts = await getProductsFromSupabase();
     
     const cartItems = [];
@@ -90,7 +92,7 @@ class DirectServiceCartProvider implements CartProvider {
     return await this.getCart(userIdentifier);
   }
 
-  async removeItems(userIdentifier: string, items: Array<{ productId: string; quantity?: number; removeAll?: boolean }>) {
+  async removeItems(userIdentifier: string, items: Array<{ productId: string; quantity?: number; removeAll?: boolean }>): Promise<Cart> {
     // Map to the format expected by deleteCartFromSupabase
     const cartItemsToRemove = items.map(item => ({
       productId: item.productId,
@@ -101,14 +103,14 @@ class DirectServiceCartProvider implements CartProvider {
     return await this.getCart(userIdentifier);
   }
 
-  async clearCart(userIdentifier: string) {
+  async clearCart(userIdentifier: string): Promise<Cart> {
     await deleteCartFromSupabase(userIdentifier);
     return await this.getCart(userIdentifier);
   }
 }
 
 class DirectServiceProfileProvider implements ProfileProvider {
-  async getShippingAddress(userIdentifier: string) {
+  async getShippingAddress(userIdentifier: string): Promise<ShippingAddress | null> {
     const profile = await getUserProfileFromSupabase(userIdentifier);
     
     if (!profile?.shippingAddress) return null;
